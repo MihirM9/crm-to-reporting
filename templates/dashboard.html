@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRM-to-Reporting Automation</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f6f8fa;
+      --surface: #ffffff;
+      --surface-hover: #f9fafb;
+      --border: #e1e5ea;
+      --border-light: #eef1f4;
+      --ink: #1a2332;
+      --ink-secondary: #4a5568;
+      --ink-muted: #8492a6;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-light: #eff6ff;
+      --accent-border: #bfdbfe;
+      --green: #059669;
+      --green-light: #ecfdf5;
+      --green-border: #a7f3d0;
+      --red: #dc2626;
+      --red-light: #fef2f2;
+      --red-border: #fecaca;
+      --amber: #d97706;
+      --amber-light: #fffbeb;
+      --amber-border: #fde68a;
+      --purple: #7c3aed;
+      --purple-light: #f5f3ff;
+      --radius: 10px;
+      --radius-lg: 14px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04);
+      --transition: 150ms ease;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Layout */
+    .app { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 240px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 0;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      overflow-y: auto;
+      z-index: 100;
+    }
+    .sidebar-brand {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border-light);
+      margin-bottom: 8px;
+    }
+    .sidebar-brand h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      line-height: 1.3;
+    }
+    .sidebar-brand span {
+      font-size: 11px;
+      color: var(--ink-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .nav-section { padding: 12px 12px 4px; }
+    .nav-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+      padding: 0 8px;
+      margin-bottom: 4px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-secondary);
+      cursor: pointer;
+      transition: all var(--transition);
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+    .nav-item:hover { background: var(--surface-hover); color: var(--ink); }
+    .nav-item.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .nav-badge {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--border-light);
+      color: var(--ink-muted);
+      padding: 1px 7px;
+      border-radius: 99px;
+    }
+    .nav-item.active .nav-badge { background: var(--accent-border); color: var(--accent); }
+
+    .main { margin-left: 240px; flex: 1; padding: 24px 32px 48px; min-width: 0; }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .page-header h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .page-header p { color: var(--ink-muted); font-size: 13px; margin-top: 2px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all var(--transition);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .btn svg { width: 15px; height: 15px; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--border); }
+    .btn-secondary:hover { background: var(--surface-hover); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+    }
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header h3 { font-size: 14px; font-weight: 650; }
+    .card-body { padding: 20px; }
+    .card-body.flush { padding: 0; }
+
+    /* Stat grid */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-sm);
+    }
+    .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); margin-bottom: 6px; }
+    .stat-value { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+    .stat-sub { font-size: 12px; color: var(--ink-muted); margin-top: 4px; }
+
+    /* Grid layouts */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+    @media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 860px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .main { margin-left: 0; padding: 16px; }
+      .mobile-nav { display: flex !important; }
+    }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left;
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--ink-muted);
+      background: var(--surface-hover);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-light);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface-hover); }
+    .mono { font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace; font-size: 12px; }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 9px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+    .badge-success { background: var(--green-light); color: var(--green); border: 1px solid var(--green-border); }
+    .badge-error { background: var(--red-light); color: var(--red); border: 1px solid var(--red-border); }
+    .badge-warn { background: var(--amber-light); color: var(--amber); border: 1px solid var(--amber-border); }
+    .badge-info { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-border); }
+    .badge-neutral { background: var(--surface-hover); color: var(--ink-muted); border: 1px solid var(--border); }
+    .badge-purple { background: var(--purple-light); color: var(--purple); border: 1px solid #ddd6fe; }
+
+    /* Tabs */
+    .tab-bar {
+      display: flex;
+      gap: 2px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-muted);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+    .tab:hover { color: var(--ink); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+    /* Sections */
+    .section { display: none; }
+    .section.active { display: block; }
+    .mb-24 { margin-bottom: 24px; }
+    .mb-16 { margin-bottom: 16px; }
+
+    /* Toast / notification */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: var(--shadow-md);
+      z-index: 999;
+      transform: translateY(-10px);
+      opacity: 0;
+      transition: all 300ms ease;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast-success { background: var(--green); color: white; }
+    .toast-error { background: var(--red); color: white; }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--ink-muted);
+    }
+    .empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
+    .empty p { font-size: 13px; }
+
+    /* Report viewer */
+    .report-frame {
+      width: 100%;
+      min-height: 500px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: white;
+    }
+
+    /* Rejected record detail */
+    .rejected-detail {
+      background: var(--surface-hover);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 12px;
+      font-family: "SF Mono", monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--ink-secondary);
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Pulse dot for running status */
+    .pulse-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* Mobile nav */
+    .mobile-nav {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 8px 12px;
+      gap: 4px;
+      z-index: 100;
+      justify-content: space-around;
+    }
+    .mobile-nav button {
+      flex: 1;
+      padding: 8px 4px;
+      border: none;
+      background: none;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--ink-muted);
+      cursor: pointer;
+      border-radius: 8px;
+    }
+    .mobile-nav button.active { color: var(--accent); background: var(--accent-light); }
+
+    /* Link style */
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Progress bar */
+    .progress-bar {
+      height: 6px;
+      background: var(--border-light);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.5s ease;
+    }
+    .progress-green { background: var(--green); }
+    .progress-red { background: var(--red); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="sidebar-brand">
+        <span>Operational Demo</span>
+        <h1>CRM-to-Reporting</h1>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Overview</div>
+        <button class="nav-item active" onclick="showSection('overview')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </button>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Data</div>
+        <button class="nav-item" onclick="showSection('crm')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 1-2-2V3h20v2a2 2 0 0 1-2 2Z"/><path d="M20 7v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7"/><path d="M12 11v4"/><path d="M8 11v1"/><path d="M16 11v1"/></svg>
+          CRM Source
+          <span class="nav-badge">{{ crm_company_count }}</span>
+        </button>
+        <button class="nav-item" onclick="showSection('reporting')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/></svg>
+          Reporting Layer
+          <span class="nav-badge">{{ rpt_company_count }}</span>
+        </button>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Operations</div>
+        <button class="nav-item" onclick="showSection('syncs')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Sync Runs
+          <span class="nav-badge">{{ total_syncs }}</span>
+        </button>
+        <button class="nav-item" onclick="showSection('rejected')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          Rejected Records
+          <span class="nav-badge">{{ total_rejected }}</span>
+        </button>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Output</div>
+        <button class="nav-item" onclick="showSection('reports')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Reports
+          <span class="nav-badge">{{ reports|length }}</span>
+        </button>
+        <button class="nav-item" onclick="showSection('api')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          API Reference
+        </button>
+      </div>
+    </nav>
+
+    <!-- Mobile bottom nav -->
+    <div class="mobile-nav">
+      <button class="active" onclick="showSection('overview')">Dashboard</button>
+      <button onclick="showSection('crm')">CRM</button>
+      <button onclick="showSection('syncs')">Syncs</button>
+      <button onclick="showSection('reports')">Reports</button>
+      <button onclick="showSection('api')">API</button>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main">
+
+      <!-- ===================== OVERVIEW ===================== -->
+      <div id="section-overview" class="section active">
+        <div class="page-header">
+          <div>
+            <h2>Dashboard</h2>
+            <p>CRM sync pipeline overview and operational health</p>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary" id="syncBtn" onclick="runSync()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Run Sync
+            </button>
+            <button class="btn btn-secondary" onclick="location.reload()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="stats">
+          <div class="stat-card">
+            <div class="stat-label">CRM Records</div>
+            <div class="stat-value">{{ crm_company_count + crm_contact_count + crm_deal_count + crm_metric_count + crm_update_count }}</div>
+            <div class="stat-sub">{{ crm_company_count }} companies, {{ crm_deal_count }} deals</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Reporting Records</div>
+            <div class="stat-value">{{ rpt_company_count + rpt_deal_count + rpt_metric_count + rpt_update_count }}</div>
+            <div class="stat-sub">{{ rpt_company_count }} companies, {{ rpt_deal_count }} deals</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Syncs</div>
+            <div class="stat-value">{{ total_syncs }}</div>
+            <div class="stat-sub">
+              <span style="color:var(--green)">{{ successful_syncs }} passed</span>
+              {% if failed_syncs %}<span style="color:var(--red)"> &middot; {{ failed_syncs }} failed</span>{% endif %}
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Rejected Records</div>
+            <div class="stat-value" {% if total_rejected > 0 %}style="color:var(--amber)"{% endif %}>{{ total_rejected }}</div>
+            <div class="stat-sub">quarantined for review</div>
+          </div>
+        </div>
+
+        <!-- Latest sync + Quick reports -->
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-header">
+              <h3>Latest Sync Run</h3>
+              {% if latest_run %}
+              <span class="badge {% if latest_run.status == 'success' %}badge-success{% elif latest_run.status == 'failed' %}badge-error{% else %}badge-info{% endif %}">
+                {% if latest_run.status == 'running' %}<span class="pulse-dot" style="margin-right:4px"></span>{% endif %}
+                {{ latest_run.status }}
+              </span>
+              {% endif %}
+            </div>
+            <div class="card-body">
+              {% if latest_run %}
+              <table>
+                <tr><td style="color:var(--ink-muted);width:130px">Run ID</td><td class="mono">#{{ latest_run.id }}</td></tr>
+                <tr><td style="color:var(--ink-muted)">Trigger</td><td>{{ latest_run.trigger_mode }}</td></tr>
+                <tr><td style="color:var(--ink-muted)">Started</td><td class="mono">{{ latest_run.started_at }}</td></tr>
+                <tr><td style="color:var(--ink-muted)">Duration</td><td>{{ latest_run.duration_ms or '—' }} ms</td></tr>
+                <tr>
+                  <td style="color:var(--ink-muted)">Records</td>
+                  <td>
+                    <span class="badge badge-info" style="margin-right:4px">{{ latest_run.extracted_count }} extracted</span>
+                    <span class="badge badge-success" style="margin-right:4px">{{ latest_run.loaded_inserted_count }} inserted</span>
+                    <span class="badge badge-neutral" style="margin-right:4px">{{ latest_run.loaded_updated_count }} updated</span>
+                    {% if latest_run.rejected_count > 0 %}
+                    <span class="badge badge-error">{{ latest_run.rejected_count }} rejected</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% if latest_run.warnings %}
+                <tr>
+                  <td style="color:var(--ink-muted)">Warnings</td>
+                  <td>
+                    {% for w in latest_run.warnings %}
+                    <span class="badge badge-warn" style="margin-bottom:2px">{{ w.entity }}: {{ w.type }}</span>
+                    {% endfor %}
+                  </td>
+                </tr>
+                {% endif %}
+              </table>
+              {% if latest_run.extracted_count and latest_run.extracted_count > 0 %}
+              <div style="margin-top:12px">
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--ink-muted); margin-bottom:2px;">
+                  <span>Pipeline health</span>
+                  <span>{{ ((latest_run.loaded_inserted_count + latest_run.loaded_updated_count) / latest_run.extracted_count * 100)|round(0)|int }}% loaded</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill progress-green" style="width:{{ ((latest_run.loaded_inserted_count + latest_run.loaded_updated_count) / latest_run.extracted_count * 100)|round(1) }}%"></div>
+                </div>
+              </div>
+              {% endif %}
+              {% else %}
+              <div class="empty">
+                <div class="empty-icon">&#8635;</div>
+                <p>No syncs yet. Click <strong>Run Sync</strong> to start.</p>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>Latest Reports</h3>
+              {% if reports %}
+              <button class="btn btn-sm btn-secondary" onclick="showSection('reports')">View all</button>
+              {% endif %}
+            </div>
+            <div class="card-body flush">
+              {% if reports %}
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Type</th><th>Format</th><th>Sync Run</th><th></th></tr></thead>
+                  <tbody>
+                  {% for report in reports[:8] %}
+                  <tr>
+                    <td>
+                      <span class="badge {% if report.report_type == 'investor' %}badge-purple{% else %}badge-info{% endif %}">
+                        {{ report.report_type }}
+                      </span>
+                    </td>
+                    <td><span class="badge badge-neutral">{{ report.output_format }}</span></td>
+                    <td class="mono">#{{ report.sync_run_id }}</td>
+                    <td>
+                      {% if report.output_format == 'html' %}
+                      <button class="btn btn-sm btn-secondary" onclick="viewReport({{ report.id }})">View</button>
+                      {% else %}
+                      <a class="btn btn-sm btn-secondary" href="/api/reporting/reports/{{ report.id }}/download">Download</a>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% else %}
+              <div class="empty">
+                <div class="empty-icon">&#128196;</div>
+                <p>Reports will appear after the first successful sync.</p>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent rejected -->
+        {% if rejected %}
+        <div class="card">
+          <div class="card-header">
+            <h3>Recent Rejected Records</h3>
+            <button class="btn btn-sm btn-secondary" onclick="showSection('rejected')">View all</button>
+          </div>
+          <div class="card-body flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Entity</th><th>External ID</th><th>Reason</th><th>Sync Run</th></tr></thead>
+                <tbody>
+                {% for row in rejected[:5] %}
+                <tr>
+                  <td><span class="badge badge-error">{{ row.entity_type }}</span></td>
+                  <td class="mono">{{ row.source_external_id or '—' }}</td>
+                  <td style="max-width:400px">{{ row.reason }}</td>
+                  <td class="mono">#{{ row.sync_run_id }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- ===================== CRM SOURCE ===================== -->
+      <div id="section-crm" class="section">
+        <div class="page-header">
+          <div>
+            <h2>CRM Source Data</h2>
+            <p>Raw records from the mock CRM API — includes intentional duplicates, missing fields, and bad data for testing</p>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat-card"><div class="stat-label">Companies</div><div class="stat-value">{{ crm_company_count }}</div></div>
+          <div class="stat-card"><div class="stat-label">Contacts</div><div class="stat-value">{{ crm_contact_count }}</div></div>
+          <div class="stat-card"><div class="stat-label">Deals</div><div class="stat-value">{{ crm_deal_count }}</div></div>
+          <div class="stat-card"><div class="stat-label">Metrics</div><div class="stat-value">{{ crm_metric_count }}</div></div>
+          <div class="stat-card"><div class="stat-label">Updates</div><div class="stat-value">{{ crm_update_count }}</div></div>
+        </div>
+
+        <div class="tab-bar">
+          <button class="tab active" onclick="showCrmTab('companies', this)">Companies</button>
+          <button class="tab" onclick="showCrmTab('contacts', this)">Contacts</button>
+          <button class="tab" onclick="showCrmTab('deals', this)">Deals</button>
+        </div>
+
+        <div id="crm-companies" class="crm-tab active" style="display:block">
+          <div class="card"><div class="card-body flush"><div class="table-wrap">
+            <table>
+              <thead><tr><th>External ID</th><th>Name</th><th>Owner</th><th>Stage</th><th>Period</th><th>Valuation</th><th>Updated</th></tr></thead>
+              <tbody>
+              {% for c in crm_companies %}
+              <tr>
+                <td class="mono">{{ c.external_id }}</td>
+                <td>{% if c.name %}{{ c.name }}{% else %}<span class="badge badge-error">missing</span>{% endif %}</td>
+                <td>{% if c.owner %}{{ c.owner }}{% else %}<span class="badge badge-error">missing</span>{% endif %}</td>
+                <td><span class="badge badge-neutral">{{ c.stage or '—' }}</span></td>
+                <td class="mono">{{ c.reporting_period or '—' }}</td>
+                <td class="mono">{% if c.valuation %}${{ "{:,.0f}".format(c.valuation) }}{% else %}—{% endif %}</td>
+                <td class="mono" style="font-size:11px">{{ c.updated_at }}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div></div></div>
+        </div>
+
+        <div id="crm-contacts" class="crm-tab" style="display:none">
+          <div class="card"><div class="card-body flush"><div class="table-wrap">
+            <table>
+              <thead><tr><th>External ID</th><th>Name</th><th>Email</th><th>Company</th><th>Owner</th></tr></thead>
+              <tbody>
+              {% for c in crm_contacts %}
+              <tr>
+                <td class="mono">{{ c.external_id }}</td>
+                <td>{{ c.full_name or '—' }}</td>
+                <td class="mono">{{ c.email or '—' }}</td>
+                <td class="mono">{{ c.company_external_id or '—' }}</td>
+                <td>{{ c.owner or '—' }}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div></div></div>
+        </div>
+
+        <div id="crm-deals" class="crm-tab" style="display:none">
+          <div class="card"><div class="card-body flush"><div class="table-wrap">
+            <table>
+              <thead><tr><th>External ID</th><th>Deal Name</th><th>Company</th><th>Stage</th><th>Owner</th><th>Amount</th></tr></thead>
+              <tbody>
+              {% for d in crm_deals %}
+              <tr>
+                <td class="mono">{{ d.external_id }}</td>
+                <td>{{ d.name or '—' }}</td>
+                <td class="mono">{{ d.company_external_id or '—' }}</td>
+                <td><span class="badge badge-neutral">{{ d.stage or '—' }}</span></td>
+                <td>{{ d.owner or '—' }}</td>
+                <td class="mono">{% if d.amount %}${{ "{:,.0f}".format(d.amount) }}{% else %}—{% endif %}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div></div></div>
+        </div>
+      </div>
+
+      <!-- ===================== REPORTING LAYER ===================== -->
+      <div id="section-reporting" class="section">
+        <div class="page-header">
+          <div>
+            <h2>Reporting Layer</h2>
+            <p>Cleaned, validated, and deduplicated records ready for report generation</p>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat-card"><div class="stat-label">Companies</div><div class="stat-value">{{ rpt_company_count }}</div></div>
+          <div class="stat-card"><div class="stat-label">Deals</div><div class="stat-value">{{ rpt_deal_count }}</div></div>
+          <div class="stat-card"><div class="stat-label">Metrics</div><div class="stat-value">{{ rpt_metric_count }}</div></div>
+          <div class="stat-card"><div class="stat-label">Updates</div><div class="stat-value">{{ rpt_update_count }}</div></div>
+        </div>
+
+        <div class="tab-bar">
+          <button class="tab active" onclick="showRptTab('rpt-companies', this)">Companies</button>
+          <button class="tab" onclick="showRptTab('rpt-deals', this)">Deal Pipeline</button>
+          <button class="tab" onclick="showRptTab('rpt-metrics', this)">Metrics</button>
+        </div>
+
+        <div id="rpt-companies" class="rpt-tab" style="display:block">
+          <div class="card"><div class="card-body flush"><div class="table-wrap">
+            <table>
+              <thead><tr><th>External ID</th><th>Company</th><th>Owner</th><th>Stage</th><th>Period</th><th>Valuation</th><th>Source</th></tr></thead>
+              <tbody>
+              {% for c in rpt_companies %}
+              <tr>
+                <td class="mono">{{ c.external_id }}</td>
+                <td><strong>{{ c.company_name }}</strong></td>
+                <td>{{ c.owner }}</td>
+                <td><span class="badge badge-success">{{ c.stage }}</span></td>
+                <td class="mono">{{ c.reporting_period }}</td>
+                <td class="mono">{% if c.valuation %}${{ "{:,.0f}".format(c.valuation) }}{% else %}—{% endif %}</td>
+                <td><span class="badge badge-neutral">{{ c.source_system }}</span></td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div></div></div>
+        </div>
+
+        <div id="rpt-deals" class="rpt-tab" style="display:none">
+          <div class="card"><div class="card-body flush"><div class="table-wrap">
+            <table>
+              <thead><tr><th>External ID</th><th>Deal</th><th>Company</th><th>Stage</th><th>Owner</th><th>Amount</th></tr></thead>
+              <tbody>
+              {% for d in rpt_deals %}
+              <tr>
+                <td class="mono">{{ d.external_id }}</td>
+                <td><strong>{{ d.deal_name }}</strong></td>
+                <td class="mono">{{ d.company_external_id or '—' }}</td>
+                <td><span class="badge badge-success">{{ d.stage }}</span></td>
+                <td>{{ d.owner }}</td>
+                <td class="mono">{% if d.amount %}${{ "{:,.0f}".format(d.amount) }}{% else %}—{% endif %}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div></div></div>
+        </div>
+
+        <div id="rpt-metrics" class="rpt-tab" style="display:none">
+          <div class="card"><div class="card-body flush"><div class="table-wrap">
+            <table>
+              <thead><tr><th>Company</th><th>Period</th><th>Revenue</th><th>EBITDA Margin</th><th>Burn Multiple</th><th>Dedupe Key</th></tr></thead>
+              <tbody>
+              {% for m in rpt_metrics %}
+              <tr>
+                <td class="mono">{{ m.company_external_id }}</td>
+                <td class="mono">{{ m.reporting_period }}</td>
+                <td class="mono">{% if m.revenue %}${{ "{:,.0f}".format(m.revenue) }}{% else %}—{% endif %}</td>
+                <td class="mono">{% if m.ebitda_margin %}{{ "%.1f"|format(m.ebitda_margin * 100) }}%{% else %}—{% endif %}</td>
+                <td class="mono">{{ m.burn_multiple or '—' }}</td>
+                <td class="mono" style="font-size:11px;color:var(--ink-muted)">{{ m.dedupe_key }}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div></div></div>
+        </div>
+      </div>
+
+      <!-- ===================== SYNC RUNS ===================== -->
+      <div id="section-syncs" class="section">
+        <div class="page-header">
+          <div>
+            <h2>Sync Runs</h2>
+            <p>Audit trail of every ETL pipeline execution with metrics and status</p>
+          </div>
+          <button class="btn btn-primary" onclick="runSync()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Run Sync
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-body flush">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Run</th>
+                    <th>Status</th>
+                    <th>Trigger</th>
+                    <th>Extracted</th>
+                    <th>Inserted</th>
+                    <th>Updated</th>
+                    <th>Rejected</th>
+                    <th>Duration</th>
+                    <th>Started</th>
+                  </tr>
+                </thead>
+                <tbody>
+                {% for run in recent_runs %}
+                <tr>
+                  <td class="mono">#{{ run.id }}</td>
+                  <td>
+                    <span class="badge {% if run.status == 'success' %}badge-success{% elif run.status == 'failed' %}badge-error{% else %}badge-info{% endif %}">
+                      {{ run.status }}
+                    </span>
+                  </td>
+                  <td>{{ run.trigger_mode }}</td>
+                  <td class="mono">{{ run.extracted_count }}</td>
+                  <td class="mono">{{ run.loaded_inserted_count }}</td>
+                  <td class="mono">{{ run.loaded_updated_count }}</td>
+                  <td class="mono">{% if run.rejected_count > 0 %}<span style="color:var(--red);font-weight:600">{{ run.rejected_count }}</span>{% else %}0{% endif %}</td>
+                  <td class="mono">{{ run.duration_ms or '—' }} ms</td>
+                  <td class="mono" style="font-size:11px">{{ run.started_at }}</td>
+                </tr>
+                {% endfor %}
+                {% if not recent_runs %}
+                <tr><td colspan="9"><div class="empty"><p>No sync runs yet.</p></div></td></tr>
+                {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== REJECTED RECORDS ===================== -->
+      <div id="section-rejected" class="section">
+        <div class="page-header">
+          <div>
+            <h2>Rejected Records</h2>
+            <p>Quarantined records that failed validation — preserved with full context for review</p>
+          </div>
+        </div>
+
+        {% if rejected %}
+        <div class="card">
+          <div class="card-body flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Entity</th><th>External ID</th><th>Reason</th><th>Sync Run</th><th>Details</th></tr></thead>
+                <tbody>
+                {% for row in rejected %}
+                <tr>
+                  <td><span class="badge badge-error">{{ row.entity_type }}</span></td>
+                  <td class="mono">{{ row.source_external_id or '—' }}</td>
+                  <td style="max-width:350px">{{ row.reason }}</td>
+                  <td class="mono">#{{ row.sync_run_id }}</td>
+                  <td>
+                    <button class="btn btn-sm btn-secondary" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                      Raw data
+                    </button>
+                    <div class="rejected-detail" style="display:none; margin-top:8px">{{ row.raw_record }}</div>
+                  </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="card"><div class="card-body"><div class="empty">
+          <div class="empty-icon">&#10003;</div>
+          <p>No rejected records. All records passed validation.</p>
+        </div></div></div>
+        {% endif %}
+      </div>
+
+      <!-- ===================== REPORTS ===================== -->
+      <div id="section-reports" class="section">
+        <div class="page-header">
+          <div>
+            <h2>Generated Reports</h2>
+            <p>Investor and internal update reports auto-generated after each successful sync</p>
+          </div>
+        </div>
+
+        {% if reports %}
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-body flush">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Type</th><th>Format</th><th>Sync Run</th><th></th></tr></thead>
+                  <tbody>
+                  {% for report in reports %}
+                  <tr id="report-row-{{ report.id }}" style="cursor:pointer" onclick="viewReport({{ report.id }})">
+                    <td>
+                      <span class="badge {% if report.report_type == 'investor' %}badge-purple{% else %}badge-info{% endif %}">
+                        {{ report.report_type }}
+                      </span>
+                    </td>
+                    <td><span class="badge badge-neutral">{{ report.output_format }}</span></td>
+                    <td class="mono">#{{ report.sync_run_id }}</td>
+                    <td>
+                      {% if report.output_format == 'html' %}
+                      <span class="btn btn-sm btn-secondary">View</span>
+                      {% else %}
+                      <a class="btn btn-sm btn-secondary" href="/api/reporting/reports/{{ report.id }}/download" onclick="event.stopPropagation()">Download</a>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 id="report-viewer-title">Report Preview</h3>
+            </div>
+            <div class="card-body" id="report-viewer">
+              <div class="empty">
+                <div class="empty-icon">&#128196;</div>
+                <p>Select an HTML report to preview it here.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="card"><div class="card-body"><div class="empty">
+          <div class="empty-icon">&#128196;</div>
+          <p>Reports will appear after the first successful sync.</p>
+        </div></div></div>
+        {% endif %}
+      </div>
+
+      <!-- ===================== API REFERENCE ===================== -->
+      <div id="section-api" class="section">
+        <div class="page-header">
+          <div>
+            <h2>API Reference</h2>
+            <p>All available REST endpoints — click any endpoint to try it</p>
+          </div>
+        </div>
+
+        <div class="card mb-24">
+          <div class="card-header"><h3>Mock CRM API</h3></div>
+          <div class="card-body flush">
+            <table>
+              <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th><th></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/mock-crm/companies</td>
+                  <td>List CRM companies with pagination and incremental filtering</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/mock-crm/companies" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/mock-crm/contacts</td>
+                  <td>List CRM contacts</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/mock-crm/contacts" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/mock-crm/deals</td>
+                  <td>List CRM deals</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/mock-crm/deals" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/mock-crm/metrics</td>
+                  <td>List CRM metrics (includes intentionally bad data)</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/mock-crm/metrics" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/mock-crm/updates</td>
+                  <td>List CRM updates</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/mock-crm/updates" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-warn">PATCH</span></td>
+                  <td class="mono">/api/mock-crm/companies/&lt;external_id&gt;</td>
+                  <td>Update a CRM company record</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card mb-24">
+          <div class="card-header"><h3>Sync Jobs</h3></div>
+          <div class="card-body flush">
+            <table>
+              <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th><th></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge badge-info">POST</span></td>
+                  <td class="mono">/api/jobs/run-sync</td>
+                  <td>Trigger a manual sync run</td>
+                  <td><button class="btn btn-sm btn-primary" onclick="runSync()">Run</button></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/jobs/latest-sync</td>
+                  <td>Get the latest sync run status and metrics</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/jobs/latest-sync" target="_blank">Try</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card mb-24">
+          <div class="card-header"><h3>Reporting Layer</h3></div>
+          <div class="card-body flush">
+            <table>
+              <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th><th></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/companies</td>
+                  <td>Validated reporting-layer companies</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/reporting/companies" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/deal-pipeline</td>
+                  <td>Clean deal pipeline records</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/reporting/deal-pipeline" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/metrics</td>
+                  <td>Deduplicated financial metrics</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/reporting/metrics" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/updates</td>
+                  <td>Validated investor/internal updates</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/reporting/updates" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/sync-runs</td>
+                  <td>Full audit trail of all sync runs</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/reporting/sync-runs" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/rejected-records</td>
+                  <td>All quarantined records with raw data</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/reporting/rejected-records" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/reports</td>
+                  <td>List all generated reports</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/reporting/reports" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/reports/&lt;id&gt;/download</td>
+                  <td>Download a generated report file</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3>Query Parameters</h3></div>
+          <div class="card-body">
+            <table>
+              <thead><tr><th>Parameter</th><th>Applies To</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">limit</td><td>CRM endpoints</td><td>Max records per page (default 50, max 100)</td></tr>
+                <tr><td class="mono">offset</td><td>CRM endpoints</td><td>Number of records to skip for pagination</td></tr>
+                <tr><td class="mono">updated_since</td><td>CRM endpoints</td><td>ISO datetime — only fetch records updated after this timestamp</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script>
+    function showSection(name) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById('section-' + name).classList.add('active');
+
+      document.querySelectorAll('.sidebar .nav-item').forEach(n => n.classList.remove('active'));
+      const navItems = document.querySelectorAll('.sidebar .nav-item');
+      const sectionMap = ['overview', 'crm', 'reporting', 'syncs', 'rejected', 'reports', 'api'];
+      const idx = sectionMap.indexOf(name);
+      if (idx >= 0 && navItems[idx]) navItems[idx].classList.add('active');
+
+      document.querySelectorAll('.mobile-nav button').forEach(b => b.classList.remove('active'));
+      const mobileMap = ['overview', 'crm', 'syncs', 'reports', 'api'];
+      const mIdx = mobileMap.indexOf(name);
+      if (mIdx >= 0) document.querySelectorAll('.mobile-nav button')[mIdx].classList.add('active');
+    }
+
+    function showCrmTab(tab, el) {
+      document.querySelectorAll('.crm-tab').forEach(t => t.style.display = 'none');
+      document.getElementById('crm-' + tab).style.display = 'block';
+      el.closest('.tab-bar').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function showRptTab(tab, el) {
+      document.querySelectorAll('.rpt-tab').forEach(t => t.style.display = 'none');
+      document.getElementById(tab).style.display = 'block';
+      el.closest('.tab-bar').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function showToast(message, type) {
+      const toast = document.getElementById('toast');
+      toast.className = 'toast toast-' + type;
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3500);
+    }
+
+    async function runSync() {
+      const btns = document.querySelectorAll('#syncBtn, .btn-primary');
+      btns.forEach(b => { if (b.textContent.includes('Run Sync') || b.textContent.includes('Run')) { b.disabled = true; b.innerHTML = '<span class="spinner"></span> Running...'; }});
+
+      try {
+        const response = await fetch('/api/jobs/run-sync', { method: 'POST' });
+        const data = await response.json();
+        if (response.ok) {
+          showToast('Sync completed successfully — reloading...', 'success');
+          setTimeout(() => location.reload(), 1200);
+        } else {
+          showToast('Sync failed: ' + (data.message || 'Unknown error'), 'error');
+          btns.forEach(b => { b.disabled = false; b.innerHTML = 'Run Sync'; });
+        }
+      } catch (err) {
+        showToast('Network error: ' + err.message, 'error');
+        btns.forEach(b => { b.disabled = false; b.innerHTML = 'Run Sync'; });
+      }
+    }
+
+    function viewReport(reportId) {
+      const viewer = document.getElementById('report-viewer');
+      const title = document.getElementById('report-viewer-title');
+      if (!viewer) return;
+      title.textContent = 'Loading...';
+      viewer.innerHTML = '<iframe class="report-frame" src="/api/reporting/reports/' + reportId + '/download" frameborder="0"></iframe>';
+      title.textContent = 'Report #' + reportId;
+    }
+  </script>
+</body>
+</html>
