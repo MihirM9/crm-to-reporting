@@ -380,6 +380,7 @@
     }
     .progress-green { background: var(--green); }
     .progress-red { background: var(--red); }
+
   </style>
 </head>
 <body>
@@ -473,6 +474,10 @@
           <div>
             <h2>Dashboard</h2>
             <p>CRM sync pipeline overview and operational health</p>
+            <div style="margin-top:8px;">
+              <span class="badge badge-warn">Demo</span>
+              <span class="badge badge-neutral">Mock CRM + mock fund admin sources</span>
+            </div>
           </div>
           <div style="display:flex; gap:8px;">
             <button class="btn btn-primary" id="syncBtn" onclick="runSync()">
