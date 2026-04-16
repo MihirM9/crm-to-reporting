@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "crm-reporting": {
+      "command": "/Users/mihir/Downloads/CRM to Reporting/.venv/bin/python",
+      "args": ["-m", "mcp_server.server"],
+      "cwd": "/Users/mihir/Downloads/CRM to Reporting"
+    }
+  }
+}
