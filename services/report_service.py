@@ -9,7 +9,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from db.models import DealPipeline, GeneratedReport, RejectedRecord, ReportingCompany, ReportingMetric, SyncRun
+from db.models import CovenantBreach, DealPipeline, GeneratedReport, ReconciliationBreak, RejectedRecord, ReportingCompany, ReportingMetric, SyncRun
+
+# PDF output is optional — weasyprint has heavy C dependencies.
+try:
+    from weasyprint import HTML as WeasyHTML  # type: ignore[import-untyped]
+    _PDF_AVAILABLE = True
+except ImportError:
+    _PDF_AVAILABLE = False
 
 
 settings = get_settings()
@@ -228,20 +235,48 @@ def generate_reports(session: Session, sync_run: SyncRun) -> list[GeneratedRepor
         ("internal", INTERNAL_TEMPLATE.render(sync_run=sync_run, deals=deals[:10], rejected=rejected, kpi_lines=kpi_lines, generated_at=generated_at)),
     ]
 
+    # Reconciliation + covenant data for enriched reports
+    recon_breaks = session.scalars(select(ReconciliationBreak).where(ReconciliationBreak.sync_run_id == sync_run.id)).all()
+    covenant_breaches = session.scalars(select(CovenantBreach).where(CovenantBreach.sync_run_id == sync_run.id)).all()
+
     created_reports: list[GeneratedReport] = []
     for report_type, markdown_body in report_payloads:
+        # Append reconciliation + covenant sections to markdown
+        if recon_breaks:
+            markdown_body += "\n## Reconciliation Breaks (CRM vs Fund Admin)\n"
+            for brk in recon_breaks:
+                markdown_body += f"- {brk.borrower_name or brk.borrower_external_id}: {brk.field} — CRM={brk.crm_value} vs Admin={brk.fund_admin_value} [{brk.severity}]\n"
+        if covenant_breaches:
+            markdown_body += "\n## Covenant Breaches\n"
+            for cb in covenant_breaches:
+                markdown_body += f"- {cb.borrower_external_id} ({cb.covenant_type}): observed={cb.observed_value}, threshold {cb.comparison} {cb.threshold} [{cb.severity}]\n"
+
         base_name = f"sync_run_{sync_run.id}_{report_type}_update"
         markdown_path = settings.report_output_dir / f"{base_name}.md"
         html_path = settings.report_output_dir / f"{base_name}.html"
         markdown_path.write_text(markdown_body, encoding="utf-8")
-        html_path.write_text(
-            HTML_TEMPLATE.render(title=f"{report_type.title()} Update", markdown=markdown_body, generated_at=generated_at, sync_run=sync_run),
-            encoding="utf-8",
+        html_content = HTML_TEMPLATE.render(
+            title=f"{report_type.title()} Update", markdown=markdown_body,
+            generated_at=generated_at, sync_run=sync_run,
         )
+        html_path.write_text(html_content, encoding="utf-8")
         created_reports.append(
             GeneratedReport(sync_run_id=sync_run.id, report_type=report_type, output_format="markdown", file_path=str(markdown_path))
         )
         created_reports.append(
             GeneratedReport(sync_run_id=sync_run.id, report_type=report_type, output_format="html", file_path=str(html_path))
         )
+
+        # PDF output — optional, depends on weasyprint being installed
+        if _PDF_AVAILABLE:
+            try:
+                pdf_path = settings.report_output_dir / f"{base_name}.pdf"
+                WeasyHTML(string=html_content).write_pdf(str(pdf_path))
+                created_reports.append(
+                    GeneratedReport(sync_run_id=sync_run.id, report_type=report_type, output_format="pdf", file_path=str(pdf_path))
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).warning("PDF generation failed — skipping", exc_info=True)
+
     return created_reports

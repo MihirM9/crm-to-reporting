@@ -9,8 +9,11 @@ from db.models import (
     CRMDeal,
     CRMMetric,
     CRMUpdate,
+    CovenantBreach,
     DealPipeline,
+    FacilityCovenant,
     GeneratedReport,
+    ReconciliationBreak,
     RejectedRecord,
     ReportingCompany,
     ReportingMetric,
@@ -83,4 +86,25 @@ def get_dashboard_context(db: Session) -> dict:
         "successful_syncs": successful_syncs,
         "failed_syncs": failed_syncs,
         "total_rejected": total_rejected,
+        # Reconciliation breaks
+        "recon_breaks": db.scalars(select(ReconciliationBreak).order_by(ReconciliationBreak.detected_at.desc()).limit(25)).all(),
+        "total_recon_breaks": db.scalar(select(func.count()).select_from(ReconciliationBreak)) or 0,
+        # Covenant breaches
+        "covenant_breaches": db.scalars(select(CovenantBreach).order_by(CovenantBreach.detected_at.desc()).limit(25)).all(),
+        "total_covenant_breaches": db.scalar(select(func.count()).select_from(CovenantBreach)) or 0,
+        "total_covenants": db.scalar(select(func.count()).select_from(FacilityCovenant)) or 0,
+        # Chart data — sync history for Chart.js
+        "chart_runs": [
+            {
+                "id": r.id,
+                "started_at": r.started_at.isoformat() if r.started_at else None,
+                "status": r.status,
+                "extracted": r.extracted_count or 0,
+                "inserted": r.loaded_inserted_count or 0,
+                "updated": r.loaded_updated_count or 0,
+                "rejected": r.rejected_count or 0,
+                "duration_ms": r.duration_ms or 0,
+            }
+            for r in recent_runs
+        ],
     }

@@ -36,8 +36,12 @@ from sqlalchemy import func, select
 
 from db.init_db import init_db
 from db.models import (
+    CovenantBreach,
     DealPipeline,
+    FacilityCovenant,
+    FundAdminRecord,
     GeneratedReport,
+    ReconciliationBreak,
     RejectedRecord,
     ReportingCompany,
     ReportingMetric,
@@ -298,6 +302,65 @@ def tool_read_report(args: dict) -> dict:
         db.close()
 
 
+def tool_list_reconciliation_breaks(args: dict) -> dict:
+    """List reconciliation breaks between CRM and fund admin positions.
+
+    These are fields where the internal reporting layer disagrees with
+    what the fund administrator has on file — the quarterly 'recon'
+    that every back office runs before signing off NAV.
+    """
+    limit = min(int(args.get("limit", 50)), 200)
+    db = SessionLocal()
+    try:
+        query = select(ReconciliationBreak).order_by(ReconciliationBreak.detected_at.desc()).limit(limit)
+        if severity := args.get("severity"):
+            query = select(ReconciliationBreak).where(
+                ReconciliationBreak.severity == severity
+            ).order_by(ReconciliationBreak.detected_at.desc()).limit(limit)
+        if borrower := args.get("borrower_external_id"):
+            query = select(ReconciliationBreak).where(
+                ReconciliationBreak.borrower_external_id == borrower
+            ).order_by(ReconciliationBreak.detected_at.desc()).limit(limit)
+        rows = db.scalars(query).all()
+        return {"count": len(rows), "breaks": [_serialize_row(r) for r in rows]}
+    finally:
+        db.close()
+
+
+def tool_list_covenant_breaches(args: dict) -> dict:
+    """List covenant breaches detected during sync runs.
+
+    Each breach records which covenant was violated, the threshold,
+    the observed value, and the severity. This is what a PM reviews
+    before a weekly credit committee meeting.
+    """
+    limit = min(int(args.get("limit", 50)), 200)
+    db = SessionLocal()
+    try:
+        query = select(CovenantBreach).order_by(CovenantBreach.detected_at.desc()).limit(limit)
+        if severity := args.get("severity"):
+            query = select(CovenantBreach).where(
+                CovenantBreach.severity == severity
+            ).order_by(CovenantBreach.detected_at.desc()).limit(limit)
+        if borrower := args.get("borrower_external_id"):
+            query = select(CovenantBreach).where(
+                CovenantBreach.borrower_external_id == borrower
+            ).order_by(CovenantBreach.detected_at.desc()).limit(limit)
+        rows = db.scalars(query).all()
+
+        # Enrich with covenant descriptions
+        enriched = []
+        for row in rows:
+            data = _serialize_row(row)
+            cov = db.scalar(select(FacilityCovenant).where(FacilityCovenant.id == row.covenant_id))
+            if cov:
+                data["covenant_description"] = cov.description
+            enriched.append(data)
+        return {"count": len(enriched), "breaches": enriched}
+    finally:
+        db.close()
+
+
 def tool_get_pipeline_stats(args: dict) -> dict:
     """Return counts across CRM, reporting layer, and rejects — the dashboard at a glance."""
     db = SessionLocal()
@@ -316,6 +379,8 @@ def tool_get_pipeline_stats(args: dict) -> dict:
             ) or 0,
             "total_rejected_records": db.scalar(select(func.count()).select_from(RejectedRecord)) or 0,
             "total_generated_reports": db.scalar(select(func.count()).select_from(GeneratedReport)) or 0,
+            "total_reconciliation_breaks": db.scalar(select(func.count()).select_from(ReconciliationBreak)) or 0,
+            "total_covenant_breaches": db.scalar(select(func.count()).select_from(CovenantBreach)) or 0,
         }
     finally:
         db.close()
@@ -428,8 +493,34 @@ TOOLS: list[dict[str, Any]] = [
         "handler": tool_read_report,
     },
     {
+        "name": "list_reconciliation_breaks",
+        "description": "List reconciliation breaks between CRM reporting layer and fund admin positions. These are the quarterly recon differences a back office resolves before signing off NAV. Optionally filter by severity (info/warning/critical) or borrower.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer"},
+                "severity": {"type": "string", "description": "Filter: info, warning, critical."},
+                "borrower_external_id": {"type": "string"},
+            },
+        },
+        "handler": tool_list_reconciliation_breaks,
+    },
+    {
+        "name": "list_covenant_breaches",
+        "description": "List covenant breaches — facility-level thresholds (DSCR, LTV, max leverage, min EBITDA margin) that a borrower has violated based on the latest metrics. What a PM reviews before credit committee.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer"},
+                "severity": {"type": "string", "description": "Filter: warning or critical."},
+                "borrower_external_id": {"type": "string"},
+            },
+        },
+        "handler": tool_list_covenant_breaches,
+    },
+    {
         "name": "get_pipeline_stats",
-        "description": "One-shot view of counts across reporting layer, sync runs, and quarantine. Quick 'is the pipeline healthy?' check.",
+        "description": "One-shot view of counts across reporting layer, sync runs, quarantine, reconciliation breaks, and covenant breaches. Quick 'is the pipeline healthy?' check.",
         "inputSchema": {"type": "object", "properties": {}},
         "handler": tool_get_pipeline_stats,
     },

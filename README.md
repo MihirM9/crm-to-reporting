@@ -1,67 +1,76 @@
-# Private Credit Ops Automation — CRM to Reporting, with an MCP Layer
+![CI](https://github.com/MihirM9/crm-to-reporting/actions/workflows/ci.yml/badge.svg)
 
-An AI-native operational spine for a private credit manager, built as a full-stack demo.
+# CRM-to-Reporting Automation for Private Credit
 
-It does three things a middle-office team would otherwise do by hand:
+A working reference implementation of the data pipeline a private credit fund's middle office actually needs: **multi-source reconciliation**, **automated covenant compliance**, and an **MCP agent layer** so a portfolio manager can query live data conversationally instead of opening dashboards.
 
-1. **Pulls borrower data** from a CRM-shaped source (deal flow, portfolio companies, covenant KPIs, quarterly updates) over REST.
+## What it does
+
+1. **Pulls borrower data** from a CRM source (deal flow, portfolio companies, covenant KPIs, quarterly updates) and a **mock fund admin** (SS&C / Citco-shaped position records) over REST.
 2. **Cleans it** — validates, deduplicates, quarantines bad rows, and upserts idempotently into a reporting layer that downstream systems (fund admin reconciliation, LP portal, watchlist reviews) can trust.
-3. **Auto-drafts the outputs** a PM actually uses — a quarterly investor update and an internal ops update — templated from the latest clean data.
-
-On top of that, it exposes the whole pipeline as an **MCP (Model Context Protocol) server**, so an agent like Claude Code can trigger syncs, query the reporting layer, surface a credit watchlist, and read generated LP letters conversationally — no SQL, no dashboards.
-
-This repo is deliberately shaped around the workflows a private credit middle/back office actually runs. See **[How this maps to real private credit workflows](#how-this-maps-to-real-private-credit-workflows)** at the bottom.
-
----
-
-## Why this exists
-
-Private credit firms sit on top of a familiar stack — CRM (HubSpot / DealCloud / Salesforce), a fund admin (SS&C, Citco, Alter Domus), a portfolio monitoring system, and an LP portal. Every quarter, somebody manually:
-
-- Pulls borrower financials out of the CRM and reconciles them against what fund admin has on file.
-- Chases missing covenant compliance certificates from portfolio companies.
-- Identifies which borrowers are drifting into a credit watch zone.
-- Writes the quarterly LP letter from a pile of spreadsheets.
-
-All of that is API-shaped and automatable. This project is a working reference implementation of the "cleaned data lake + agent-callable tools" pattern that makes it possible.
+3. **Reconciles CRM vs fund admin** — diffs valuations and stages between the two sources, classifies breaks by severity, and writes them to an auditable `reconciliation_breaks` table.
+4. **Checks covenant compliance** — evaluates facility-level covenants (min EBITDA margin, max leverage, max burn multiple) against the latest borrower metrics and flags breaches.
+5. **Auto-drafts reports** — quarterly investor update and internal ops update, templated from clean data, output as Markdown + HTML (+ PDF if weasyprint is installed).
+6. **Exposes everything as an MCP server** — 13 agent-callable tools so Claude Code (or any MCP client) can trigger syncs, query borrowers, surface the credit watchlist, review reconciliation breaks, check covenant breaches, and read LP letters — no SQL, no dashboards needed.
 
 ---
 
-## Architecture at a glance
+## Architecture
 
 ```
- ┌──────────────────┐          ┌─────────────────────────────────┐
- │   Mock CRM API   │  REST    │  Sync Service                   │
- │ /api/mock-crm/*  │ ───────▶ │  • incremental, checkpointed    │
- │ (companies,      │          │  • retries with backoff         │
- │  deals, metrics, │          │  • validates each row           │
- │  updates,        │          │  • dedupes deterministically    │
- │  contacts)       │          │  • quarantines bad rows         │
- └──────────────────┘          │  • idempotent upserts           │
-                               └──────┬──────────────────┬───────┘
-                                      │                  │
-                                      ▼                  ▼
-                        ┌──────────────────┐  ┌──────────────────┐
-                        │ Reporting Layer  │  │ rejected_records │
-                        │ • borrowers      │  │ (quarantine +    │
-                        │ • facilities     │  │  raw payload)    │
-                        │ • covenant KPIs  │  └──────────────────┘
-                        │ • updates        │
-                        │ • sync_runs      │
-                        └────────┬─────────┘
-                                 │
-                    ┌────────────┴────────────┐
-                    ▼                         ▼
-       ┌────────────────────┐     ┌────────────────────────┐
-       │ Report Generator   │     │ MCP Server (stdio)     │
-       │ Investor + Internal│     │ 11 tools — run_sync,   │
-       │ MD + HTML, templated│    │ list_borrowers,        │
-       │                    │     │ list_watchlist, etc.   │
-       └─────────┬──────────┘     └──────────┬─────────────┘
-                 │                           │
-                 ▼                           ▼
-          Flask Dashboard              Claude Code / any
-          + REST API                   MCP-aware client
+ ┌──────────────────┐   ┌───────────────────┐
+ │   Mock CRM API   │   │ Mock Fund Admin   │
+ │ /api/mock-crm/*  │   │ /api/mock-admin/* │
+ │ (companies,      │   │ (positions with   │
+ │  deals, metrics, │   │  valuations,      │
+ │  updates,        │   │  stages,          │
+ │  contacts)       │   │  balances)        │
+ └────────┬─────────┘   └────────┬──────────┘
+          │      REST            │
+          ▼                      ▼
+ ┌─────────────────────────────────────────────┐
+ │  Sync Service                               │
+ │  • incremental, checkpointed                │
+ │  • retries with exponential backoff         │
+ │  • row-level validation + batch checks      │
+ │  • deterministic dedupe                     │
+ │  • idempotent upserts                       │
+ │  • quarantines bad rows to rejected_records │
+ └───────┬────────────────────┬────────────────┘
+         │                    │
+         ▼                    ▼
+ ┌──────────────────┐  ┌──────────────────────┐
+ │ Reporting Layer  │  │ rejected_records     │
+ │ • borrowers      │  │ (quarantine + raw)   │
+ │ • facilities     │  └──────────────────────┘
+ │ • covenant KPIs  │
+ │ • updates        │
+ │ • sync_runs      │
+ └──────┬───────────┘
+        │
+  ┌─────┴──────────────────────────────────┐
+  │                                        │
+  ▼                                        ▼
+ ┌─────────────────────┐  ┌──────────────────────────────┐
+ │ Post-Sync Checks    │  │ Report Generator             │
+ │ • Reconciliation    │  │ Investor + Internal MD/HTML  │
+ │   (CRM vs Admin)    │  │ + PDF (optional, weasyprint) │
+ │ • Covenant breach   │  └──────────┬───────────────────┘
+ │   detection         │             │
+ └──────┬──────────────┘             ▼
+        │                   Flask Dashboard + REST API
+        ▼                   (Chart.js sync history)
+ ┌──────────────────────────┐
+ │ MCP Server (stdio)       │
+ │ 13 tools — run_sync,     │
+ │ list_borrowers,          │
+ │ list_reconciliation_     │
+ │   breaks,                │
+ │ list_covenant_breaches,  │
+ │ list_watchlist, etc.     │
+ └──────────────────────────┘
+        ▼
+  Claude Code / any MCP client
 ```
 
 ---
@@ -69,7 +78,6 @@ All of that is API-shaped and automatable. This project is a working reference i
 ## Quick start
 
 ```bash
-# Clone and install
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -84,11 +92,20 @@ python main.py
 ```
 
 That gets you:
-- A seeded SQLite DB with 10 borrowers, 6 facilities, 8 covenant KPI records, 5 quarterly updates (with intentionally broken rows so validation and quarantine are visible).
-- A dashboard showing sync runs, pipeline health, the reporting layer, rejected rows, and auto-generated reports — all in one internal-ops-style UI.
+- A seeded SQLite DB with 10 borrowers, 6 facilities, 8 covenant KPI records, 5 quarterly updates, 5 fund admin positions (with intentional discrepancies), and 6 facility covenants.
+- A dashboard showing sync runs, pipeline health, reconciliation breaks, covenant breaches, the reporting layer, rejected rows, and auto-generated reports.
+- A sync history chart (Chart.js) visualizing inserted/updated/rejected counts across runs.
 - A scheduled sync running every 3 minutes, plus manual trigger via button or `POST /api/jobs/run-sync`.
 
-Run the test suite:
+### PDF reports (optional)
+
+```bash
+pip install weasyprint   # requires system libs — see weasyprint docs
+```
+
+If weasyprint is installed, PDF reports are generated alongside MD and HTML after each sync. If not, the system works fine without it — the import is guarded.
+
+### Run the test suite
 
 ```bash
 python -m pytest tests/ -v
@@ -97,16 +114,17 @@ python -m pytest tests/ -v
 
 ---
 
-## The MCP layer — the piece a PM actually uses
+## The MCP layer
 
-Running the dashboard is fine for a demo. The point of this project is that **a portfolio manager should never need to open the dashboard**. They should be able to ask Claude Code:
+The point of this project is that **a portfolio manager should never need to open the dashboard**. They should be able to ask Claude Code:
 
 > "Which borrowers are on the watch list this quarter?"
+> "Any reconciliation breaks between CRM and fund admin?"
+> "Are there covenant breaches I should know about?"
 > "Pull the draft LP letter for last sync run."
 > "Anything get rejected in the latest sync?"
-> "Show me revenue movement across the portfolio."
 
-…and get real answers from live data. That's what the MCP server provides.
+…and get real answers from live data.
 
 ### Wiring it into Claude Code
 
@@ -124,8 +142,6 @@ Add to your project's `.mcp.json` (or `~/.claude/mcp.json` for global access):
 }
 ```
 
-Claude Code will spawn the server on startup and list its tools automatically.
-
 ### Tools exposed
 
 | Tool | Purpose (in private credit terms) |
@@ -138,13 +154,13 @@ Claude Code will spawn the server on startup and list its tools automatically.
 | `get_kpi_movements` | Period-over-period revenue / margin / burn-multiple deltas per borrower. |
 | `list_watchlist` | Auto-surfaced credit watchlist — negative EBITDA, burn > 2.0x, declining revenue. |
 | `list_rejected_records` | Review quarantined rows — missing covenant data, bad types, invalid stages. |
+| `list_reconciliation_breaks` | CRM vs fund admin recon diffs — valuation mismatches, stage disagreements. |
+| `list_covenant_breaches` | Facility-level covenant violations with observed vs threshold values. |
 | `list_reports` | List generated investor and internal updates. |
 | `read_report` | Pull a full LP-letter draft into the conversation for editing. |
-| `get_pipeline_stats` | One-shot pipeline health snapshot. |
+| `get_pipeline_stats` | One-shot pipeline health snapshot including recon + covenant counts. |
 
 ### Test it without Claude Code
-
-The MCP server speaks plain JSON-RPC over stdio — you can drive it from a shell:
 
 ```bash
 printf '%s\n' \
@@ -156,43 +172,63 @@ printf '%s\n' \
 
 ### Why hand-rolled instead of using the MCP SDK?
 
-Two reasons:
-1. **Dependency hygiene.** MCP is just JSON-RPC 2.0 over newline-delimited stdio. Writing ~120 lines of it keeps the project installable anywhere Python runs, with no transitive pydantic/rpds-py wheel builds.
-2. **Transparency.** Anyone reviewing this repo can read the whole protocol surface in one file (`mcp_server/server.py`) instead of chasing SDK layers. Useful when the reviewer's job is evaluating whether you actually understand agent integration.
+1. **Dependency hygiene.** MCP is just JSON-RPC 2.0 over newline-delimited stdio. Writing ~150 lines of it keeps the project installable anywhere Python runs, with no transitive pydantic/rpds-py wheel builds.
+2. **Transparency.** Anyone reviewing this repo can read the whole protocol surface in one file (`mcp_server/server.py`).
 
 ---
 
 ## Project layout
 
 ```
-api/                  Flask blueprints — mock CRM, reporting, jobs, dashboard
-services/             Sync orchestration, CRM client, report generation, dashboard context
+api/                  Flask blueprints — mock CRM, mock fund admin, reporting, jobs, dashboard
+services/             Sync orchestration, CRM client, reconciliation, covenant compliance, report generation
 jobs/                 APScheduler background sync
 validators/           Row-level + batch-level validation rules
 dedupe/               Deterministic dedupe (external_id, composite key fallback)
 db/                   SQLAlchemy models, session, schema init, seed data
-reports/              Template outputs — generated MD + HTML reports live under reports/generated/
-templates/            Flask dashboard (single-page, tabbed internal-ops UI)
-mcp_server/           MCP stdio server + 11 agent-callable tools
+reports/              Template outputs — generated MD + HTML + PDF reports
+templates/            Flask dashboard (single-page, tabbed internal-ops UI with Chart.js)
+mcp_server/           MCP stdio server + 13 agent-callable tools
 scripts/              Ops utilities (seed_demo, run_sync_once)
 tests/                Unit tests + integration tests (including MCP tool coverage)
 app/                  Config (.env loader), logging, shared schemas
 main.py               Flask entry point (bootstraps data, starts scheduler)
+.github/workflows/    CI — pytest on Python 3.11 & 3.12 for every push and PR
 ```
 
 ---
 
-## Core behaviors (per the original spec)
+## Core behaviors
 
+- **Multi-source ingestion.** CRM source + fund admin source, reconciled post-sync.
 - **Incremental sync with checkpoints.** `sync_runs.checkpoint_ended_at` carries forward so re-runs don't re-fetch the world.
 - **Idempotent upserts.** All reporting tables unique on `external_id` (or composite dedupe key for metrics). Safe to replay any run.
 - **Retries with exponential backoff.** `services/crm_client.py` retries 5xx / connection errors up to `CRM_API_MAX_RETRIES`.
 - **Row-level validation.** Missing required fields, bad types, invalid enums → quarantined to `rejected_records` with raw payload + human-readable reason.
-- **Batch-level checks.** Zero-row pulls, null-heavy datasets, abnormal row-count deltas → surfaced as run warnings (not failures).
+- **Batch-level checks.** Zero-row pulls, null-heavy datasets, abnormal row-count deltas → surfaced as run warnings.
+- **Fund admin reconciliation.** Post-sync diff of CRM vs fund admin on valuation, stage, and other fields. Breaks classified as info/warning/critical and persisted for audit.
+- **Covenant compliance.** Facility covenants (min EBITDA margin, max leverage, max burn multiple) evaluated against latest metrics. Breaches recorded with observed vs threshold values.
 - **Run-level metrics.** `sync_runs` captures extracted / transformed / inserted / updated / rejected / duration / warnings for every execution.
 - **Structured logging.** JSON logs on stderr with `event` + `context` tags.
-- **Scheduled + manual triggers.** APScheduler runs every `SYNC_INTERVAL_SECONDS` (default 180s). Manual trigger via `POST /api/jobs/run-sync`, the dashboard button, or the `run_sync` MCP tool.
-- **Report generation.** After each successful sync, both investor and internal templates render to both markdown and HTML, saved under `reports/generated/` and exposed via `/api/reporting/reports`.
+- **Report generation.** After each successful sync, investor and internal templates render to MD + HTML (+ PDF if weasyprint is installed), now enriched with reconciliation + covenant breach sections.
+- **Continuous integration.** GitHub Actions runs the pytest suite on Python 3.11 and 3.12 for every push and PR, and smoke-tests the MCP server subprocess.
+
+---
+
+## How this maps to real private credit workflows
+
+| Private credit workflow | Mapped feature |
+|---|---|
+| **Deal sourcing → IC → closing pipeline** tracked in DealCloud / Salesforce | `crm_deals` / `deal_pipeline` — stage enum mirrors a typical IC funnel |
+| **Quarterly borrower compliance certificates** re-keyed by analysts | `crm_metrics` → `reporting_metrics`, with type validation |
+| **Fund admin reconciliation** — quarterly CSV from SS&C / Citco | `reconciliation_service.py` diffs CRM vs fund admin, writes breaks |
+| **Covenant compliance checks** before credit committee | `covenant_service.py` evaluates thresholds per facility |
+| **Duplicate borrower records** from multiple deal teams | `dedupe/rules.py` — external_id primary, normalized composite fallback |
+| **Quarterly LP letter** hand-written from spreadsheets | `report_service.py` — auto-drafted from clean data in MD + HTML + PDF |
+| **Credit watchlist reviews** before PM meeting | `list_watchlist` MCP tool — flags borrowers with negative EBITDA, burn > 2.0x, or declining revenue |
+| **"Why is Borrower X missing from Q1 numbers?"** | `rejected_records` + `list_rejected_records` — every quarantined row preserved with reason |
+| **Audit / LP diligence on pipeline execution** | `sync_runs` + `list_sync_runs` — full trail with metrics |
+| **PM asks a natural-language question** | MCP layer — 13 tools covering read + write operations |
 
 ---
 
@@ -212,31 +248,15 @@ REPORT_OUTPUT_DIR=reports/generated
 LOG_LEVEL=INFO
 ```
 
-To point at a real CRM: swap `CRM_API_BASE_URL` and replace the thin `CRMClient._request` method. Nothing else needs to change — the sync service is decoupled from the source.
-
----
-
-## How this maps to real private credit workflows
-
-| Private credit workflow | Mapped feature in this repo |
-|---|---|
-| **Deal sourcing → IC → closing pipeline** tracked in DealCloud / Salesforce | `crm_deals` / `deal_pipeline` — stage enum mirrors a typical IC funnel (sourced → screening → ic → term_sheet → closed_won/lost) |
-| **Quarterly borrower compliance certificates** (revenue, EBITDA margin, leverage / burn proxies) re-keyed by analysts | `crm_metrics` → `reporting_metrics`, with type validation catching the "Excel dumped the value as a string" problem |
-| **Duplicate borrower records** from multiple deal teams entering the same name with slight variations | `dedupe/rules.py` — external_id primary, normalized name + reporting period composite key fallback |
-| **Fund admin reconciliation** — quarterly CSV from SS&C / Citco that doesn't match internal CRM | The sync service's idempotent upsert pattern is how you'd reconcile without double-counting |
-| **Quarterly LP letter** hand-written in Word from a pile of spreadsheets | `report_service.py` — templated investor update in MD + HTML, auto-drafted from the latest clean data |
-| **Credit watchlist reviews** before a weekly PM meeting | `list_watchlist` MCP tool — flags borrowers with negative EBITDA, burn > 2.0x, or declining revenue |
-| **"Why is Borrower X missing from my Q1 numbers?"** | `rejected_records` table + `list_rejected_records` MCP tool — every quarantined row preserved with reason and raw payload, not silently dropped |
-| **Audit / LP diligence asking for pipeline execution history** | `sync_runs` + `list_sync_runs` — full trail with metrics, status, duration, warnings |
-| **PM wants to ask a natural-language question instead of opening a dashboard** | MCP layer — 11 agent-callable tools covering read + write operations |
+To point at a real CRM: swap `CRM_API_BASE_URL` and replace `CRMClient._request`. Nothing else needs to change.
 
 ---
 
 ## Tradeoffs and explicit non-goals
 
-- **SQLite over Postgres** for the demo. The SQLAlchemy layer makes Postgres a one-env-var swap.
-- **In-process APScheduler** — production would externalize orchestration (Airflow, Prefect, Temporal) with retry policies and alerting.
-- **Mock CRM API** lives at `/api/mock-crm/*` in the same Flask app. Pointing at a real CRM is a base-URL change plus swapping the request method if auth differs.
-- **No auth** — intentional, to keep the demo readable. A real deployment would sit behind a reverse proxy with SSO.
-- **No PDF output** for reports. MD + HTML only; adding PDF is a one-library change (weasyprint / xhtml2pdf) on top of the existing HTML template.
-- **Not a replacement** for a real middle/back office stack — it's a reference implementation of the *integration pattern*, not a shipping product.
+- **SQLite over Postgres** for the demo. SQLAlchemy makes Postgres a one-env-var swap.
+- **In-process APScheduler** — production would externalize orchestration (Airflow, Prefect, Temporal).
+- **Mock CRM + fund admin APIs** live in the same Flask app. Pointing at real sources is a base-URL change.
+- **No auth** — intentional for readability. Production would sit behind SSO.
+- **PDF output optional** — depends on weasyprint (C deps). System works without it.
+- **Not a replacement** for a real middle/back office stack — it's a reference implementation of the *integration pattern*.

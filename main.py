@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from api.dashboard import router as dashboard_router
 from api.jobs import router as jobs_router
+from api.mock_admin import router as mock_admin_router
 from api.mock_crm import router as mock_crm_router
 from api.reporting import router as reporting_router
 from app.config import get_settings
@@ -34,6 +35,7 @@ def create_app() -> Flask:
     bootstrap_data()
     app = Flask(__name__, template_folder="templates")
     app.register_blueprint(dashboard_router)
+    app.register_blueprint(mock_admin_router)
     app.register_blueprint(mock_crm_router)
     app.register_blueprint(reporting_router)
     app.register_blueprint(jobs_router)

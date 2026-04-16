@@ -5,11 +5,33 @@ from datetime import datetime
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from db.models import CRMCompany, CRMContact, CRMDeal, CRMMetric, CRMUpdate, DealPipeline, GeneratedReport, RejectedRecord, ReportingCompany, ReportingMetric, ReportingUpdate, SyncRun
+from db.models import (
+    CRMCompany,
+    CRMContact,
+    CRMDeal,
+    CRMMetric,
+    CRMUpdate,
+    CovenantBreach,
+    DealPipeline,
+    FacilityCovenant,
+    FundAdminRecord,
+    GeneratedReport,
+    ReconciliationBreak,
+    RejectedRecord,
+    ReportingCompany,
+    ReportingMetric,
+    ReportingUpdate,
+    SyncRun,
+)
 
 
 def seed_mock_crm(db: Session) -> None:
-    for model in (GeneratedReport, RejectedRecord, SyncRun, ReportingUpdate, ReportingMetric, DealPipeline, ReportingCompany, CRMCompany, CRMContact, CRMDeal, CRMMetric, CRMUpdate):
+    for model in (
+        CovenantBreach, ReconciliationBreak, GeneratedReport, RejectedRecord,
+        SyncRun, ReportingUpdate, ReportingMetric, DealPipeline, ReportingCompany,
+        FacilityCovenant, FundAdminRecord,
+        CRMCompany, CRMContact, CRMDeal, CRMMetric, CRMUpdate,
+    ):
         db.execute(delete(model))
 
     companies = [
@@ -69,5 +91,38 @@ def seed_mock_crm(db: Session) -> None:
         CRMUpdate(external_id="UPD-504", company_external_id="COMP-104", reporting_period="2025-Q4", update_type="portfolio", summary="Harbor Bio completed Phase IIa milestones on schedule. Cash runway extended to Q3 2027 with follow-on capital.", updated_at=datetime.fromisoformat("2026-01-16T12:00:00"), source_system="mock_crm"),
     ]
 
-    db.add_all(companies + contacts + deals + metrics + updates)
+    # ------------------------------------------------------------------
+    # Fund admin records — what SS&C / Citco has on file.
+    # Intentional discrepancies vs CRM to demonstrate reconciliation:
+    #   COMP-100: valuation off by $3M (CRM $125M vs admin $122M)
+    #   COMP-104: stage mismatch (CRM "portfolio" vs admin "monitoring")
+    #   COMP-106: valuation off by $15M (CRM $210M vs admin $195M) — material
+    #   COMP-107: principal balance exists only in admin (no CRM match field)
+    # ------------------------------------------------------------------
+    fund_admin_records = [
+        FundAdminRecord(external_id="FA-100", borrower_external_id="COMP-100", borrower_name="Northstar Health", reporting_period="2026-Q1", fund_admin_valuation=122000000, fund_admin_principal_balance=50000000, fund_admin_stage="portfolio", as_of_date=datetime.fromisoformat("2026-04-01T00:00:00"), source_system="mock_fund_admin"),
+        FundAdminRecord(external_id="FA-101", borrower_external_id="COMP-101", borrower_name="Lattice Grid", reporting_period="2026-Q1", fund_admin_valuation=42000000, fund_admin_principal_balance=None, fund_admin_stage="qualified", as_of_date=datetime.fromisoformat("2026-04-03T00:00:00"), source_system="mock_fund_admin"),
+        FundAdminRecord(external_id="FA-104", borrower_external_id="COMP-104", borrower_name="Harbor Bio", reporting_period="2025-Q4", fund_admin_valuation=99000000, fund_admin_principal_balance=35000000, fund_admin_stage="monitoring", as_of_date=datetime.fromisoformat("2026-01-15T00:00:00"), source_system="mock_fund_admin"),
+        FundAdminRecord(external_id="FA-106", borrower_external_id="COMP-106", borrower_name="Verdant Energy", reporting_period="2026-Q1", fund_admin_valuation=195000000, fund_admin_principal_balance=80000000, fund_admin_stage="portfolio", as_of_date=datetime.fromisoformat("2026-04-07T00:00:00"), source_system="mock_fund_admin"),
+        FundAdminRecord(external_id="FA-107", borrower_external_id="COMP-107", borrower_name="Pinnacle Fintech", reporting_period="2026-Q1", fund_admin_valuation=64000000, fund_admin_principal_balance=25000000, fund_admin_stage="monitoring", as_of_date=datetime.fromisoformat("2026-04-04T00:00:00"), source_system="mock_fund_admin"),
+    ]
+
+    # ------------------------------------------------------------------
+    # Facility covenants — thresholds a borrower must meet each quarter.
+    # Seeded against closed/active deals.
+    # ------------------------------------------------------------------
+    covenants = [
+        # Verdant Growth Round — closed_won, healthy
+        FacilityCovenant(facility_external_id="DEAL-304", borrower_external_id="COMP-106", covenant_type="min_ebitda_margin", threshold=0.10, comparison=">=", description="EBITDA margin must stay above 10%"),
+        FacilityCovenant(facility_external_id="DEAL-304", borrower_external_id="COMP-106", covenant_type="max_leverage", threshold=5.0, comparison="<=", description="Debt/EBITDA must not exceed 5.0x"),
+        # Pinnacle Bridge Note — sourced, but covenant pre-set for IC
+        FacilityCovenant(facility_external_id="DEAL-305", borrower_external_id="COMP-107", covenant_type="min_ebitda_margin", threshold=0.0, comparison=">=", description="EBITDA margin must be non-negative"),
+        FacilityCovenant(facility_external_id="DEAL-305", borrower_external_id="COMP-107", covenant_type="max_burn_multiple", threshold=2.5, comparison="<=", description="Burn multiple must not exceed 2.5x"),
+        # Harbor Follow-on — term_sheet
+        FacilityCovenant(facility_external_id="DEAL-301", borrower_external_id="COMP-104", covenant_type="min_ebitda_margin", threshold=0.15, comparison=">=", description="EBITDA margin >= 15%"),
+        # Northstar (no deal in pipeline but has metrics) — attach to a synthetic facility for demo
+        FacilityCovenant(facility_external_id="DEAL-SYNTH-100", borrower_external_id="COMP-100", covenant_type="max_burn_multiple", threshold=2.0, comparison="<=", description="Burn multiple must not exceed 2.0x"),
+    ]
+
+    db.add_all(companies + contacts + deals + metrics + updates + fund_admin_records + covenants)
     db.commit()

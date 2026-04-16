@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session
 
 from db.models import DealPipeline, GeneratedReport, RejectedRecord, ReportingCompany, ReportingMetric, ReportingUpdate, SyncRun
 from dedupe.rules import metric_dedupe_key
+from services.covenant_service import check_covenants
 from services.crm_client import CRMClient
+from services.reconciliation_service import run_reconciliation
 from services.report_service import generate_reports
 from validators.rules import run_batch_checks, validate_company, validate_deal, validate_metric, validate_update
 
@@ -100,6 +102,26 @@ class SyncService:
             reports = generate_reports(self.db, sync_run)
             for report in reports:
                 self.db.add(report)
+
+            # Post-sync: reconcile CRM vs fund admin
+            recon_breaks = run_reconciliation(self.db, sync_run.id)
+            if recon_breaks:
+                warnings.append({
+                    "entity": "reconciliation",
+                    "type": "breaks_detected",
+                    "message": f"Found {len(recon_breaks)} reconciliation break(s) between CRM and fund admin.",
+                })
+                sync_run.warnings = warnings
+
+            # Post-sync: check covenant compliance
+            covenant_breaches = check_covenants(self.db, sync_run.id)
+            if covenant_breaches:
+                warnings.append({
+                    "entity": "covenants",
+                    "type": "breaches_detected",
+                    "message": f"Detected {len(covenant_breaches)} covenant breach(es).",
+                })
+                sync_run.warnings = warnings
 
             self.db.commit()
             self.db.refresh(sync_run)

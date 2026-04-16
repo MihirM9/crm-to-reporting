@@ -428,6 +428,20 @@
       </div>
 
       <div class="nav-section">
+        <div class="nav-label">Compliance</div>
+        <button class="nav-item" onclick="showSection('reconciliation')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-6"/><path d="M21 3l-9 9"/><path d="M3 3l9 9"/></svg>
+          Reconciliation
+          <span class="nav-badge">{{ total_recon_breaks }}</span>
+        </button>
+        <button class="nav-item" onclick="showSection('covenants')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Covenant Breaches
+          <span class="nav-badge">{{ total_covenant_breaches }}</span>
+        </button>
+      </div>
+
+      <div class="nav-section">
         <div class="nav-label">Output</div>
         <button class="nav-item" onclick="showSection('reports')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -497,7 +511,27 @@
             <div class="stat-value" {% if total_rejected > 0 %}style="color:var(--amber)"{% endif %}>{{ total_rejected }}</div>
             <div class="stat-sub">quarantined for review</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-label">Recon Breaks</div>
+            <div class="stat-value" {% if total_recon_breaks > 0 %}style="color:var(--amber)"{% endif %}>{{ total_recon_breaks }}</div>
+            <div class="stat-sub">CRM vs fund admin</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Covenant Breaches</div>
+            <div class="stat-value" {% if total_covenant_breaches > 0 %}style="color:var(--red)"{% endif %}>{{ total_covenant_breaches }}</div>
+            <div class="stat-sub">of {{ total_covenants }} tracked</div>
+          </div>
         </div>
+
+        <!-- Sync History Chart -->
+        {% if chart_runs %}
+        <div class="card mb-24">
+          <div class="card-header"><h3>Sync History</h3></div>
+          <div class="card-body" style="height:260px;padding:12px 16px;">
+            <canvas id="syncChart"></canvas>
+          </div>
+        </div>
+        {% endif %}
 
         <!-- Latest sync + Quick reports -->
         <div class="grid-2 mb-24">
@@ -901,6 +935,92 @@
         {% endif %}
       </div>
 
+      <!-- ===================== RECONCILIATION ===================== -->
+      <div id="section-reconciliation" class="section">
+        <div class="page-header">
+          <div>
+            <h2>Reconciliation Breaks</h2>
+            <p>CRM reporting layer vs fund admin positions — quarterly recon diffs</p>
+          </div>
+        </div>
+        {% if recon_breaks %}
+        <div class="card">
+          <div class="card-body flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Borrower</th><th>Field</th><th>CRM Value</th><th>Admin Value</th><th>Delta %</th><th>Severity</th><th>Sync</th></tr></thead>
+                <tbody>
+                {% for brk in recon_breaks %}
+                <tr>
+                  <td>{{ brk.borrower_name or brk.borrower_external_id }}</td>
+                  <td class="mono">{{ brk.field }}</td>
+                  <td class="mono">{{ brk.crm_value or '—' }}</td>
+                  <td class="mono">{{ brk.fund_admin_value or '—' }}</td>
+                  <td class="mono">{% if brk.break_pct is not none %}{{ brk.break_pct }}%{% else %}—{% endif %}</td>
+                  <td>
+                    <span class="badge {% if brk.severity == 'critical' %}badge-error{% elif brk.severity == 'warning' %}badge-warn{% else %}badge-info{% endif %}">
+                      {{ brk.severity }}
+                    </span>
+                  </td>
+                  <td class="mono">#{{ brk.sync_run_id }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="card"><div class="card-body"><div class="empty">
+          <div class="empty-icon">&#10003;</div>
+          <p>No reconciliation breaks. CRM and fund admin are in sync.</p>
+        </div></div></div>
+        {% endif %}
+      </div>
+
+      <!-- ===================== COVENANTS ===================== -->
+      <div id="section-covenants" class="section">
+        <div class="page-header">
+          <div>
+            <h2>Covenant Breaches</h2>
+            <p>Facility-level covenant violations detected from latest borrower metrics</p>
+          </div>
+        </div>
+        {% if covenant_breaches %}
+        <div class="card">
+          <div class="card-body flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Borrower</th><th>Facility</th><th>Covenant</th><th>Threshold</th><th>Observed</th><th>Period</th><th>Severity</th></tr></thead>
+                <tbody>
+                {% for cb in covenant_breaches %}
+                <tr>
+                  <td class="mono">{{ cb.borrower_external_id }}</td>
+                  <td class="mono">{{ cb.facility_external_id }}</td>
+                  <td>{{ cb.covenant_type }}</td>
+                  <td class="mono">{{ cb.comparison }} {{ cb.threshold }}</td>
+                  <td class="mono" style="color:var(--red)">{{ cb.observed_value }}</td>
+                  <td class="mono">{{ cb.reporting_period or '—' }}</td>
+                  <td>
+                    <span class="badge {% if cb.severity == 'critical' %}badge-error{% else %}badge-warn{% endif %}">
+                      {{ cb.severity }}
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="card"><div class="card-body"><div class="empty">
+          <div class="empty-icon">&#128170;</div>
+          <p>No covenant breaches detected. All facilities within compliance.</p>
+        </div></div></div>
+        {% endif %}
+      </div>
+
       <!-- ===================== REPORTS ===================== -->
       <div id="section-reports" class="section">
         <div class="page-header">
@@ -1095,6 +1215,30 @@
                   <td>Download a generated report file</td>
                   <td></td>
                 </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/reconciliation-breaks</td>
+                  <td>CRM vs fund admin reconciliation breaks</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/reporting/reconciliation-breaks" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/covenant-breaches</td>
+                  <td>Detected covenant breaches</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/reporting/covenant-breaches" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/reporting/facility-covenants</td>
+                  <td>All facility covenant thresholds</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/reporting/facility-covenants" target="_blank">Try</a></td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">GET</span></td>
+                  <td class="mono">/api/mock-admin/positions</td>
+                  <td>Mock fund admin position records</td>
+                  <td><a class="btn btn-sm btn-secondary" href="/api/mock-admin/positions" target="_blank">Try</a></td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -1128,7 +1272,7 @@
 
       document.querySelectorAll('.sidebar .nav-item').forEach(n => n.classList.remove('active'));
       const navItems = document.querySelectorAll('.sidebar .nav-item');
-      const sectionMap = ['overview', 'crm', 'reporting', 'syncs', 'rejected', 'reports', 'api'];
+      const sectionMap = ['overview', 'crm', 'reporting', 'syncs', 'rejected', 'reconciliation', 'covenants', 'reports', 'api'];
       const idx = sectionMap.indexOf(name);
       if (idx >= 0 && navItems[idx]) navItems[idx].classList.add('active');
 
@@ -1188,6 +1332,44 @@
       viewer.innerHTML = '<iframe class="report-frame" src="/api/reporting/reports/' + reportId + '/download" frameborder="0"></iframe>';
       title.textContent = 'Report #' + reportId;
     }
+  </script>
+
+  <!-- Chart.js — sync history visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script>
+  (function() {
+    const canvas = document.getElementById('syncChart');
+    if (!canvas) return;
+    const chartData = {{ chart_runs | tojson }};
+    if (!chartData.length) return;
+    const labels = chartData.map(r => r.started_at ? new Date(r.started_at).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '#' + r.id).reverse();
+    const inserted = chartData.map(r => r.inserted).reverse();
+    const updated = chartData.map(r => r.updated).reverse();
+    const rejected = chartData.map(r => r.rejected).reverse();
+
+    new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Inserted', data: inserted, backgroundColor: '#059669', borderRadius: 3 },
+          { label: 'Updated', data: updated, backgroundColor: '#2563eb', borderRadius: 3 },
+          { label: 'Rejected', data: rejected, backgroundColor: '#dc2626', borderRadius: 3 },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+        },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+          y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } } },
+        },
+      }
+    });
+  })();
   </script>
 </body>
 </html>

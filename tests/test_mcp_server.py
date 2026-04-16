@@ -144,6 +144,36 @@ def test_mcp_run_sync_and_downstream_tools(patched_crm):
     )
     assert "Portfolio" in _extract_text(resp)["content"] or "Sync" in _extract_text(resp)["content"]
 
+    # 8. Reconciliation breaks — CRM vs fund admin should produce breaks
+    resp = handle_request(
+        {"jsonrpc": "2.0", "id": 11, "method": "tools/call",
+         "params": {"name": "list_reconciliation_breaks", "arguments": {}}}
+    )
+    recon = _extract_text(resp)
+    assert recon["count"] >= 1  # seed data has valuation + stage discrepancies
+    # Verdant Energy should have a material valuation break ($210M vs $195M)
+    verdant_breaks = [b for b in recon["breaks"] if b["borrower_external_id"] == "COMP-106"]
+    assert any(b["field"] == "valuation" for b in verdant_breaks)
+
+    # 9. Covenant breaches — Pinnacle should breach min_ebitda_margin (negative)
+    resp = handle_request(
+        {"jsonrpc": "2.0", "id": 12, "method": "tools/call",
+         "params": {"name": "list_covenant_breaches", "arguments": {}}}
+    )
+    breaches = _extract_text(resp)
+    assert breaches["count"] >= 1
+    pinnacle_breaches = [b for b in breaches["breaches"] if b["borrower_external_id"] == "COMP-107"]
+    assert len(pinnacle_breaches) >= 1  # negative EBITDA margin and/or burn > 2.5
+
+    # 10. Pipeline stats should include new counters
+    resp = handle_request(
+        {"jsonrpc": "2.0", "id": 13, "method": "tools/call",
+         "params": {"name": "get_pipeline_stats", "arguments": {}}}
+    )
+    stats = _extract_text(resp)
+    assert stats["total_reconciliation_breaks"] >= 1
+    assert stats["total_covenant_breaches"] >= 1
+
 
 def test_mcp_unknown_tool_returns_error():
     resp = handle_request(
