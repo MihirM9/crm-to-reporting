@@ -84,6 +84,10 @@ Then try:
 
 Each of those invokes a real tool against the live reporting layer — not a chatbot reading a static summary.
 
+### MCP example
+
+![MCP rejected records summary](docs/screenshots/mcp-rejected-records-summary.png)
+
 ## What's real vs. mocked
 
 **Real:** the validation logic, the reconciliation logic, the covenant checks, the report generation, the agent tools, and the tests.
