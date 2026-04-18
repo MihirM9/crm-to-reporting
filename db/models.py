@@ -184,6 +184,14 @@ class GeneratedReport(Base):
     created_at = Column(DateTime, default=utcnow)
 
 
+class AppState(Base):
+    __tablename__ = "app_state"
+
+    key = Column(String(64), primary_key=True)
+    value = Column(String(255), nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
 # ---------------------------------------------------------------------------
 # Fund admin source + reconciliation
 # ---------------------------------------------------------------------------

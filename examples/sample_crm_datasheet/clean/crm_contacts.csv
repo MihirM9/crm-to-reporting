@@ -1,0 +1,7 @@
+external_id,company_external_id,full_name,email,owner,updated_at,source_system
+CONT-300,COMP-200,Leah Turner,leah.turner@atlas.test,Ava Chen,2026-04-17T10:00:00,mock_crm
+CONT-301,COMP-201,Ryan Patel,ryan.patel@summit.test,Daniel Ortiz,2026-04-17T10:05:00,mock_crm
+CONT-302,COMP-202,Naomi Brooks,naomi.brooks@mariner.test,Ivy Shah,2026-04-17T10:10:00,mock_crm
+CONT-303,COMP-203,Victor Hale,victor.hale@helio.test,Marcus Webb,2026-04-17T10:15:00,mock_crm
+CONT-304,COMP-204,Elena Ward,elena.ward@cedar.test,Sam Rivera,2026-04-17T10:20:00,mock_crm
+CONT-305,COMP-205,Jonah Price,jonah.price@oakline.test,Daniel Ortiz,2026-04-17T10:25:00,mock_crm

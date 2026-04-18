@@ -1,0 +1,6 @@
+external_id,company_external_id,name,stage,owner,amount,updated_at,source_system
+DEAL-405,COMP-201,Summit Growth Round,ic,Daniel Ortiz,22000000,2026-04-17T11:00:00,mock_crm
+DEAL-405,COMP-201,Summit Growth Round,ic,Daniel Ortiz,22000000,2026-04-17T10:55:00,mock_crm
+DEAL-406,COMP-999,Orphan Deal,sourced,Ops Queue,3500000,2026-04-17T11:10:00,mock_crm
+DEAL-407,COMP-208,Blue Mesa Sidecar,unknown_stage,Ops Queue,4000000,2026-04-17T11:20:00,mock_crm
+DEAL-408,COMP-207,Delta Amendment,term_sheet,,7000000,2026-04-17T11:30:00,mock_crm

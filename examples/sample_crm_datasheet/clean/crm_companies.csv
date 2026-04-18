@@ -1,0 +1,7 @@
+external_id,name,owner,stage,reporting_period,valuation,updated_at,source_system,status
+COMP-200,Atlas Specialty Finance,Ava Chen,portfolio,2026-Q2,185000000,2026-04-17T09:00:00,mock_crm,active
+COMP-201,Summit Diagnostics,Daniel Ortiz,qualified,2026-Q2,52000000,2026-04-17T09:10:00,mock_crm,active
+COMP-202,Mariner Payments,Ivy Shah,monitoring,2026-Q2,78000000,2026-04-17T09:20:00,mock_crm,active
+COMP-203,Helio Grid Systems,Marcus Webb,new,2026-Q2,34000000,2026-04-17T09:30:00,mock_crm,active
+COMP-204,Cedar Clinical Network,Sam Rivera,portfolio,2026-Q2,128000000,2026-04-17T09:40:00,mock_crm,active
+COMP-205,Oakline Software,Daniel Ortiz,realized,2026-Q2,91000000,2026-04-17T09:50:00,mock_crm,active

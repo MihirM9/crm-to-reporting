@@ -13,9 +13,11 @@ from api.reporting import router as reporting_router
 from app.config import get_settings
 from app.logging_utils import configure_logging
 from db.init_db import init_db
+from db.models import AppState, CRMCompany
 from db.seed_data import seed_mock_crm
 from db.session import SessionLocal
 from jobs.scheduler import start_scheduler, stop_scheduler
+from services.demo_import_service import get_boot_mode, set_boot_mode
 
 
 settings = get_settings()
@@ -25,7 +27,14 @@ def bootstrap_data() -> None:
     init_db()
     db = SessionLocal()
     try:
-        if not db.execute(text("SELECT COUNT(*) FROM crm_companies")).scalar():
+        crm_count = db.query(CRMCompany).count()
+        boot_mode = get_boot_mode(db)
+        if boot_mode is None:
+            if crm_count == 0:
+                seed_mock_crm(db)
+            set_boot_mode(db, "seeded_demo")
+            db.commit()
+        elif boot_mode == "seeded_demo" and not crm_count:
             seed_mock_crm(db)
     finally:
         db.close()

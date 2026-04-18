@@ -1,0 +1,5 @@
+external_id,company_external_id,reporting_period,update_type,summary,updated_at,source_system
+UPD-600,COMP-200,2026-Q2,investor,"Atlas closed a strategic add-on and expanded lender coverage. Revenue grew 8% quarter over quarter, with EBITDA margin improving to 21%.",2026-04-17T13:00:00,mock_crm
+UPD-601,COMP-201,2026-Q2,internal,"Summit progressed to IC with reimbursement diligence still open. Management expects payer mix improvements in the second half.",2026-04-17T13:10:00,mock_crm
+UPD-602,COMP-202,2026-Q2,portfolio,"Mariner resolved two servicing exceptions and improved collections performance. Burn multiple declined from 1.8x to 1.5x.",2026-04-17T13:20:00,mock_crm
+UPD-603,COMP-204,2026-Q2,investor,"Cedar added three enterprise customers and remains ahead of plan. Gross retention held above 95% during the quarter.",2026-04-17T13:30:00,mock_crm

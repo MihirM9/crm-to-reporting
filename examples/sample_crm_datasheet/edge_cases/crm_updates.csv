@@ -1,0 +1,6 @@
+external_id,company_external_id,reporting_period,update_type,summary,updated_at,source_system
+UPD-604,COMP-201,2026-Q2,internal,"Summit remains on plan; diligence items are narrowing.",2026-04-17T13:40:00,mock_crm
+UPD-604,COMP-201,2026-Q2,internal,"Summit remains on plan; diligence items are narrowing.",2026-04-17T13:35:00,mock_crm
+UPD-605,COMP-207,2026-Q2,portfolio,"",2026-04-17T13:45:00,mock_crm
+UPD-606,COMP-208,2026-Q2,unknown_type,"Blue Mesa update with invalid update type.",2026-04-17T13:50:00,mock_crm
+UPD-607,,2026-Q2,investor,"Missing company link should fail validation.",2026-04-17T13:55:00,mock_crm

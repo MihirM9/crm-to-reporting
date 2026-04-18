@@ -1,0 +1,8 @@
+external_id,name,owner,stage,reporting_period,valuation,updated_at,source_system,status
+COMP-201,Summit Diagnostics,Daniel Ortiz,qualified,2026-Q2,52000000,2026-04-17T09:10:00,mock_crm,active
+COMP-201,Summit Diagnostics,Daniel Ortiz,qualified,2026-Q2,52000000,2026-04-17T08:50:00,mock_crm,active
+COMP-206,,Ava Chen,new,2026-Q2,24000000,2026-04-17T09:55:00,mock_crm,active
+COMP-207,Delta Care Partners,,portfolio,2026-Q2,66000000,2026-04-17T10:05:00,mock_crm,active
+COMP-208,Blue Mesa Credit,Ops Queue,mystery_stage,2026-Q2,47000000,2026-04-17T10:15:00,mock_crm,active
+COMP-209,Legacy Holdings,Sam Rivera,realized,,12500000,2026-04-17T10:25:00,mock_crm,active
+COMP-210,Malformed Valuation Co,Sam Rivera,qualified,2026-Q2,not_a_number,2026-04-17T10:35:00,mock_crm,active

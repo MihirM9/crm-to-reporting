@@ -8,6 +8,8 @@ from sqlalchemy import Select, select
 from app.schemas import paginated_response
 from db.models import CRMCompany, CRMContact, CRMDeal, CRMMetric, CRMUpdate
 from db.session import SessionLocal
+from services.demo_import_service import import_recruiter_sheet_bytes, reset_demo_data
+from services.sync_service import SyncService
 
 
 router = Blueprint("mock_crm", __name__, url_prefix="/api/mock-crm")
@@ -83,5 +85,55 @@ def patch_company(external_id: str):
         db.commit()
         db.refresh(company)
         return jsonify(_serialize(company))
+    finally:
+        db.close()
+
+
+@router.post("/reset-demo")
+def reset_demo():
+    db = SessionLocal()
+    try:
+        deleted = reset_demo_data(db)
+        return jsonify({"status": "success", "message": "Demo data reset. Database is ready for custom CSV import.", "deleted": deleted})
+    finally:
+        db.close()
+
+
+@router.post("/import-sheet")
+def import_sheet():
+    uploaded = request.files.get("file")
+    if not uploaded:
+        return jsonify({"message": "Missing file upload. Send multipart/form-data with field name 'file'."}), 400
+
+    reset_first = str(request.form.get("reset_first", "false")).lower() in {"1", "true", "yes"}
+    run_sync = str(request.form.get("run_sync", "false")).lower() in {"1", "true", "yes"}
+
+    db = SessionLocal()
+    try:
+        reset_summary = reset_demo_data(db) if reset_first else None
+        summary = import_recruiter_sheet_bytes(db, uploaded.read())
+        payload: dict[str, object] = {
+            "status": "success",
+            "message": "Recruiter sheet imported into mock CRM.",
+            "reset_summary": reset_summary,
+            "import_summary": {
+                "total_rows": summary.total_rows,
+                "imported_rows": summary.imported_rows,
+                "skipped_rows": summary.skipped_rows,
+                "counts_by_entity": summary.counts_by_entity,
+            },
+        }
+        if run_sync:
+            sync_run = SyncService(db).run_sync(trigger_mode="csv_import")
+            payload["sync_run"] = {
+                "sync_run_id": sync_run.id,
+                "status": sync_run.status,
+                "extracted_count": sync_run.extracted_count,
+                "loaded_inserted_count": sync_run.loaded_inserted_count,
+                "loaded_updated_count": sync_run.loaded_updated_count,
+                "rejected_count": sync_run.rejected_count,
+                "message": sync_run.status_message or "",
+            }
+        return jsonify(payload)
     finally:
         db.close()

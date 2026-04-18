@@ -1,0 +1,6 @@
+external_id,company_external_id,reporting_period,revenue,ebitda_margin,burn_multiple,updated_at,source_system
+MET-506,COMP-201,2026-Q2,9700000,0.11,1.4,2026-04-17T12:20:00,mock_crm
+MET-506,COMP-201,2026-Q2,9700000,0.11,1.4,2026-04-17T12:10:00,mock_crm
+MET-507,COMP-208,2026-Q2,not_a_number,0.07,2.4,2026-04-17T12:30:00,mock_crm
+MET-508,COMP-207,,12500000,0.13,1.2,2026-04-17T12:40:00,mock_crm
+MET-509,,2026-Q2,8400000,0.05,2.7,2026-04-17T12:50:00,mock_crm

@@ -1,0 +1,6 @@
+external_id,company_external_id,name,stage,owner,amount,updated_at,source_system
+DEAL-400,COMP-201,Summit Growth Round,ic,Daniel Ortiz,22000000,2026-04-17T11:00:00,mock_crm
+DEAL-401,COMP-203,Helio Seed Extension,screening,Marcus Webb,6500000,2026-04-17T11:10:00,mock_crm
+DEAL-402,COMP-202,Mariner Structured Credit,term_sheet,Ivy Shah,18000000,2026-04-17T11:20:00,mock_crm
+DEAL-403,COMP-204,Cedar Follow-on,closed_won,Sam Rivera,14500000,2026-04-17T11:30:00,mock_crm
+DEAL-404,COMP-200,Atlas Add-on Acquisition,sourced,Ava Chen,9000000,2026-04-17T11:40:00,mock_crm
