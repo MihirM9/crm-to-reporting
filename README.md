@@ -107,10 +107,3 @@ python -m pytest tests/ -v
 
 Built as a portfolio piece for a private credit ops role. The point isn't the mock data — it's showing the pattern that middle-office teams actually need: validated input, reconciled numbers, audited outputs, covenant monitoring, and an agent layer on top.
 
-## Contributors
-
-See [CONTRIBUTORS.md](/Users/mihir/Downloads/CRM%20to%20Reporting/CONTRIBUTORS.md).
-
-## Tiny easter egg
-
-For a little internet nostalgia while testing demos: [Google Gravity](https://mrdoob.com/projects/chromeexperiments/google-gravity/).
