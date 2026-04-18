@@ -6,7 +6,7 @@ A small app that takes messy borrower data from a CRM, cleans it, checks it agai
 
 This is a demo, not a live system. The data sources are mocked so you can run it on a laptop in under a minute.
 
-## What it does, in plain English
+## What it does
 
 Every time you run it, the app:
 
@@ -92,6 +92,4 @@ python -m pytest tests/ -v
 
 11 tests, all green. CI runs them on every push against Python 3.11 and 3.12.
 
-## Who built this and why
 
-Built as a portfolio piece for a private credit ops role. The point isn't the mock data — it's showing the pattern that middle-office teams actually need: validated input, reconciled numbers, audited outputs, covenant monitoring, and an agent layer on top.
