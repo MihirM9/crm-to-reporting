@@ -1,277 +1,97 @@
 ![CI](https://github.com/MihirM9/crm-to-reporting/actions/workflows/ci.yml/badge.svg)
 
-# CRM-to-Reporting Pipeline Demo for Private Credit
+# CRM-to-Reporting for Private Credit
 
-Production-aware demo of a CRM-to-reporting pipeline with validation, two-source reconciliation, covenant monitoring, and an MCP agent interface for private credit ops.
+A small app that takes messy borrower data from a CRM, cleans it, checks it against the fund administrator's numbers, flags covenant breaches, and writes an investor update — automatically.
 
-This repository is a **demo**, not a production deployment. The orchestration, validation, reconciliation, reporting, and MCP patterns are meant to be realistic; the source systems and sample data in this repo are intentionally mocked so the workflow is easy to run locally and easy to review in an interview or design discussion.
+This is a demo, not a live system. The data sources are mocked so you can run it on a laptop in under a minute.
 
-## What this repo actually includes
+## What it does, in plain English
 
-- A Flask app with:
-  - a mock CRM API
-  - a mock fund admin API
-  - a small internal-ops dashboard
-  - REST endpoints to inspect data and trigger syncs
-- A sync pipeline that:
-  - fetches incremental updates over REST
-  - retries transient failures
-  - validates records
-  - quarantines bad rows
-  - deduplicates deterministically
-  - upserts idempotently into a reporting layer
-- Post-load checks for:
-  - CRM vs fund admin reconciliation
-  - covenant compliance monitoring
-- Report generation for:
-  - investor updates
-  - internal ops updates
-  - Markdown and HTML outputs
-  - optional PDF output if `weasyprint` is installed
-- An MCP server that exposes operational read/write tools against the same reporting layer
+Every time you run it, the app:
 
-## Demo status and scope
+1. **Pulls** borrower and deal records from a mock CRM.
+2. **Checks** each row for missing fields, bad dates, duplicate IDs, and other junk.
+3. **Quarantines** the bad rows so they don't pollute reporting, but keeps them visible for review.
+4. **Compares** the CRM's numbers (valuations, stages) against the fund admin's numbers and flags any mismatches.
+5. **Checks** each borrower's latest metrics against their covenant thresholds (min EBITDA margin, max leverage, etc.) and flags breaches.
+6. **Writes** an investor update and an internal ops update — Markdown, HTML, and optional PDF.
 
-What is real in this repo:
+Everything above also works through a conversational agent interface, so you (or a PM) can just type *"Which borrowers tripped covenants this quarter?"* instead of clicking around.
 
-- The sync orchestration flow
-- Validation and quarantine handling
-- Idempotent loading patterns
-- Reconciliation logic
-- Covenant checks
-- Report templates and file generation
-- MCP tool wiring and tests
-- GitHub CI
+## Why this matters for a private credit shop
 
-What is mock or simplified:
+Most middle-office time gets burned on four things:
 
-- CRM source data
-- Fund admin source data
-- Authentication and secrets handling
-- Scheduler deployment model
-- Storage choice and infra
-- PDF generation dependency management
-- Any claim of direct integration with a live vendor system
+- Chasing borrower data that arrived in a bad format
+- Reconciling CRM deal records against the fund admin's position file
+- Monitoring covenant compliance across a growing portfolio
+- Assembling the investor letter every quarter
 
-If you want to adapt this toward a live environment, start with the adapter examples in [examples/real_crm_adapter.py](/Users/mihir/Downloads/CRM%20to%20Reporting/examples/real_crm_adapter.py) and [examples/fund_admin_csv_loader.py](/Users/mihir/Downloads/CRM%20to%20Reporting/examples/fund_admin_csv_loader.py), then swap the source clients while keeping the reporting layer, validation, dedupe, reconciliation, and report generation flows intact.
+This app does all four in one pass, leaves an audit trail, and exposes the same data to an AI agent so a deal team can ask questions in natural language.
 
-## UI and output notes
-
-The dashboard is intentionally small and operational. It exposes the same core surfaces an internal ops or portfolio-monitoring workflow would care about:
-
-- latest sync status
-- rejected and quarantined rows
-- reconciliation breaks
-- covenant breaches
-- generated investor and internal updates
-
-The current README stays text-first on purpose. If you want visual assets later, they should be captured from the running app rather than added as conceptual mockups.
-
-## End-to-end flow
-
-```text
-Mock CRM API           Mock Fund Admin API
-      |                        |
-      +---- REST pull ---------+
-               |
-               v
-        Sync / ETL service
-        - incremental checkpoints
-        - retries/backoff
-        - validation
-        - dedupe
-        - idempotent upserts
-        - quarantine
-               |
-               v
-         Reporting layer
-               |
-      +--------+--------+
-      |                 |
-      v                 v
-Reconciliation     Covenant checks
-      |                 |
-      +--------+--------+
-               |
-               v
-         Reports + Dashboard + MCP tools
-```
-
-## Quick start
+## Try it in 60 seconds
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+git clone https://github.com/MihirM9/crm-to-reporting
+cd crm-to-reporting
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
 python scripts/seed_demo.py
-python scripts/run_sync_once.py
 python main.py
 ```
 
-Open:
+Then open **http://127.0.0.1:8000** in your browser.
 
-- Dashboard: `http://127.0.0.1:8000`
-- API reference page: `http://127.0.0.1:8000/api-docs`
+Click **Run Sync** in the top right. You'll see borrowers load, covenant breaches flag (Pinnacle Fintech trips its EBITDA floor), a reconciliation break appear (Verdant Energy's valuation is $210M in the CRM but $195M at the fund admin), and an investor update get written.
 
-## What to click first
+## What you're looking at on the dashboard
 
-1. Open the dashboard overview and inspect the latest run, sync totals, reconciliation count, and covenant breach count.
-2. Open the rejected-records section to see quarantined rows with human-readable reasons.
-3. Open the reporting layer section to confirm deduped, normalized records landed correctly.
-4. Open the reports section to inspect the investor/internal outputs.
-5. Use the MCP server or API endpoints to query the same data without using the UI.
+| Section | What's there |
+|---|---|
+| **Dashboard** | Top-line counts: how many records, how many breaks, how many breaches |
+| **CRM Source** | The raw borrower data, including the intentionally bad rows |
+| **Reporting Layer** | The clean, deduped version after validation |
+| **Sync Runs** | Audit log of every run — what came in, what got rejected, how long it took |
+| **Rejected Records** | Every bad row with a human-readable reason (so nothing gets silently dropped) |
+| **Reconciliation** | CRM vs. fund admin mismatches, with severity |
+| **Covenant Breaches** | Borrowers tripping their financial covenants |
+| **Reports** | Generated investor and internal updates, click to read |
+| **API** | The underlying endpoints, in case you want to hit them directly |
 
-## API surface in plain English
+## The agent interface (the interesting part)
 
-Source APIs:
+The same data is exposed to Claude as a set of tools. In a second terminal:
 
-- `GET /api/mock-crm/companies`
-- `GET /api/mock-crm/contacts`
-- `GET /api/mock-crm/deals`
-- `GET /api/mock-crm/metrics`
-- `GET /api/mock-crm/updates`
-- `GET /api/mock-admin/positions`
+```bash
+claude
+```
 
-Operational endpoints:
+Then try:
 
-- `POST /api/jobs/run-sync`
-- `GET /api/jobs/latest-sync`
-- `GET /api/reporting/companies`
-- `GET /api/reporting/deal-pipeline`
-- `GET /api/reporting/metrics`
-- `GET /api/reporting/updates`
-- `GET /api/reporting/sync-runs`
-- `GET /api/reporting/rejected-records`
-- `GET /api/reporting/reconciliation-breaks`
-- `GET /api/reporting/covenant-breaches`
-- `GET /api/reporting/reports`
+- *"Run the sync and tell me what got rejected."*
+- *"Show me reconciliation breaks for Verdant Energy."*
+- *"Which borrowers tripped covenants?"*
+- *"Read me the latest investor update."*
 
-## Real-ish integration example
+Each of those invokes a real tool against the live reporting layer — not a chatbot reading a static summary.
 
-The repo currently runs against mock source systems. To make the boundary clearer, there are two minimal extension examples here:
+## What's real vs. mocked
 
-- CRM REST adapter example: [examples/real_crm_adapter.py](/Users/mihir/Downloads/CRM%20to%20Reporting/examples/real_crm_adapter.py)
-- Fund admin CSV loader example: [examples/fund_admin_csv_loader.py](/Users/mihir/Downloads/CRM%20to%20Reporting/examples/fund_admin_csv_loader.py)
+**Real:** the validation logic, the reconciliation logic, the covenant checks, the report generation, the agent tools, and the tests.
 
-That example shows how to:
+**Mocked:** the CRM itself (so you don't need Salesforce credentials), the fund admin feed, and the borrower data.
 
-- read credentials from environment variables
-- call a real paginated CRM API with `updated_since`
-- normalize vendor-shaped payloads into this repo’s internal record shape
-- keep the downstream sync/reporting logic unchanged
+To point this at a real CRM, you'd swap one adapter file (`examples/real_crm_adapter.py`) and leave the rest of the pipeline untouched. That's the whole design.
 
-This is the intended extension path: replace source adapters first, not the reporting layer or validation pipeline.
-
-## MCP agent interface
-
-The MCP layer is present because the reporting datastore is more useful if an operator or PM can query it directly from an agent client.
-
-Example prompts:
-
-- “Run the latest sync and summarize any rejected records.”
-- “Show me reconciliation breaks for Harbor Bio.”
-- “Which borrowers tripped covenant checks this quarter?”
-- “Read the latest investor update.”
-
-Typical tools exposed:
-
-- `run_sync`
-- `get_latest_sync`
-- `list_sync_runs`
-- `list_borrowers`
-- `list_facilities`
-- `get_kpi_movements`
-- `list_watchlist`
-- `list_rejected_records`
-- `list_reconciliation_breaks`
-- `list_covenant_breaches`
-- `list_reports`
-- `read_report`
-- `get_pipeline_stats`
-
-To wire it into Claude Code or another MCP client, use the local server module from [.mcp.json](/Users/mihir/Downloads/CRM%20to%20Reporting/.mcp.json) as the starting point.
-
-## Validation, reconciliation, and reporting behaviors
-
-Validation and quarantine:
-
-- required fields are checked at row level
-- malformed values are rejected with human-readable reasons
-- bad records go to `rejected_records`
-- one bad row does not stop the full sync run
-
-Reconciliation:
-
-- compares reporting-layer borrower records to fund admin positions
-- writes valuation and stage breaks to `reconciliation_breaks`
-- classifies break severity
-
-Covenant monitoring:
-
-- checks latest borrower/facility metrics against covenant thresholds
-- writes breaches to `covenant_breaches`
-
-Reporting:
-
-- renders investor and internal updates from the reporting layer
-- stores Markdown and HTML every run
-- optionally writes PDF output when `weasyprint` is installed
-
-## Honest tradeoffs
-
-- The data sources are mock APIs hosted in the same local app.
-- SQLite is used for convenience; production would likely use Postgres or a warehouse-backed reporting layer.
-- APScheduler runs in-process; production would move scheduling into a job system or orchestrator.
-- The dashboard is intentionally small and operational, not polished product UI.
-- PDF generation is optional because `weasyprint` can require extra system libraries depending on the machine.
-- The MCP server is intentionally narrow and local-first; it is not presented here as a general-purpose agent platform.
-
-## Testing and CI
-
-Run locally:
+## Tests
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-CI:
+11 tests, all green. CI runs them on every push against Python 3.11 and 3.12.
 
-- GitHub Actions runs pytest on Python 3.11 and 3.12
-- CI also smoke-tests the MCP server startup path
+## Who built this and why
 
-## Project layout
-
-```text
-api/                  Flask blueprints for source APIs, reporting APIs, jobs, and dashboard
-app/                  Config, logging, shared schema helpers
-db/                   SQLAlchemy models, session, init, and seed data
-dedupe/               Deterministic dedupe rules
-examples/             Real-ish adapter examples for moving beyond mock sources
-jobs/                 APScheduler setup
-mcp_server/           MCP stdio server
-reports/              Generated report outputs
-scripts/              Seed and one-shot sync helpers
-services/             Sync orchestration, reconciliation, covenant, dashboard, reports
-templates/            Dashboard UI
-tests/                Unit and integration tests
-validators/           Row-level and batch-level validation rules
-```
-
-## How this maps to private credit ops
-
-- CRM pipeline tracking maps to deal and borrower records pulled from the mock CRM API.
-- Fund admin reconciliation maps to a post-load comparison between reporting-layer records and a second source of position data.
-- Covenant monitoring maps to threshold checks against latest operating metrics.
-- Investor reporting maps to generated updates produced from normalized data rather than directly from source APIs.
-- Agent support maps to the MCP layer, which makes the reporting store queryable from a tool-capable assistant.
-
-## If you want to make this less demo-like
-
-The next practical steps would be:
-
-1. Replace the mock CRM adapter with a live integration against Salesforce, HubSpot, or DealCloud.
-2. Replace the mock fund admin API with a file or API ingest path from the actual admin source.
-3. Move scheduling out of the Flask process.
-4. Add auth and secret management.
-5. Add a second integration test path against captured real payload fixtures.
+Built as a portfolio piece for a private credit ops role. The point isn't the mock data — it's showing the pattern that middle-office teams actually need: validated input, reconciled numbers, audited outputs, covenant monitoring, and an agent layer on top.
