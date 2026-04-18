@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from xml.sax.saxutils import escape
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from jinja2 import Template
 from sqlalchemy import select
@@ -190,13 +191,6 @@ HTML_TEMPLATE = Template(
 """
 )
 
-
-@dataclass
-class ReportArtifacts:
-    markdown_path: Path
-    html_path: Path
-
-
 def _build_kpi_lines(session: Session) -> list[str]:
     metrics = session.scalars(select(ReportingMetric).order_by(ReportingMetric.company_external_id)).all()
     lines: list[str] = []
@@ -221,6 +215,87 @@ def _build_kpi_lines(session: Session) -> list[str]:
         else:
             lines.append(f"{company_id}: revenue missing in latest reporting period {latest.reporting_period}")
     return lines[:10]
+
+
+def _write_docx_report(path: Path, title: str, markdown_body: str, sync_run: SyncRun, generated_at: str) -> None:
+    paragraphs = [
+        title,
+        f"Sync run: {sync_run.id}",
+        f"Status: {sync_run.status}",
+        f"Generated at: {generated_at}",
+        "",
+    ]
+    paragraphs.extend(markdown_body.splitlines())
+
+    body_xml = []
+    for line in paragraphs:
+        text = escape(line or "")
+        body_xml.append(
+            f"<w:p><w:r><w:t xml:space=\"preserve\">{text}</w:t></w:r></w:p>"
+        )
+
+    document_xml = (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+        "<w:document xmlns:wpc=\"http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas\" "
+        "xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" "
+        "xmlns:o=\"urn:schemas-microsoft-com:office:office\" "
+        "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
+        "xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\" "
+        "xmlns:v=\"urn:schemas-microsoft-com:vml\" "
+        "xmlns:wp14=\"http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing\" "
+        "xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" "
+        "xmlns:w10=\"urn:schemas-microsoft-com:office:word\" "
+        "xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" "
+        "xmlns:w14=\"http://schemas.microsoft.com/office/word/2010/wordml\" "
+        "xmlns:w15=\"http://schemas.microsoft.com/office/word/2012/wordml\" "
+        "xmlns:wpg=\"http://schemas.microsoft.com/office/word/2010/wordprocessingGroup\" "
+        "xmlns:wpi=\"http://schemas.microsoft.com/office/word/2010/wordprocessingInk\" "
+        "xmlns:wne=\"http://schemas.microsoft.com/office/2006/wordml\" "
+        "xmlns:wps=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\" "
+        "mc:Ignorable=\"w14 w15 wp14\">"
+        "<w:body>"
+        + "".join(body_xml)
+        + "<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/><w:pgMar w:top=\"1440\" w:right=\"1440\" "
+        "w:bottom=\"1440\" w:left=\"1440\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/>"
+        "<w:cols w:space=\"720\"/><w:docGrid w:linePitch=\"360\"/></w:sectPr>"
+        "</w:body></w:document>"
+    )
+
+    content_types_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+</Types>"""
+    rels_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>"""
+    app_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
+ xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>CRM-to-Reporting Automation</Application>
+</Properties>"""
+    core_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+ xmlns:dc="http://purl.org/dc/elements/1.1/"
+ xmlns:dcterms="http://purl.org/dc/terms/"
+ xmlns:dcmitype="http://purl.org/dc/dcmitype/"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>{escape(title)}</dc:title>
+  <dc:creator>CRM-to-Reporting Automation</dc:creator>
+</cp:coreProperties>"""
+
+    with ZipFile(path, "w", compression=ZIP_DEFLATED) as docx:
+        docx.writestr("[Content_Types].xml", content_types_xml)
+        docx.writestr("_rels/.rels", rels_xml)
+        docx.writestr("docProps/app.xml", app_xml)
+        docx.writestr("docProps/core.xml", core_xml)
+        docx.writestr("word/document.xml", document_xml)
 
 
 def generate_reports(session: Session, sync_run: SyncRun) -> list[GeneratedReport]:
@@ -253,18 +328,19 @@ def generate_reports(session: Session, sync_run: SyncRun) -> list[GeneratedRepor
 
         base_name = f"sync_run_{sync_run.id}_{report_type}_update"
         markdown_path = settings.report_output_dir / f"{base_name}.md"
-        html_path = settings.report_output_dir / f"{base_name}.html"
+        docx_path = settings.report_output_dir / f"{base_name}.docx"
         markdown_path.write_text(markdown_body, encoding="utf-8")
+        title = f"{report_type.title()} Update"
+        _write_docx_report(docx_path, title, markdown_body, sync_run, generated_at)
         html_content = HTML_TEMPLATE.render(
-            title=f"{report_type.title()} Update", markdown=markdown_body,
+            title=title, markdown=markdown_body,
             generated_at=generated_at, sync_run=sync_run,
         )
-        html_path.write_text(html_content, encoding="utf-8")
         created_reports.append(
             GeneratedReport(sync_run_id=sync_run.id, report_type=report_type, output_format="markdown", file_path=str(markdown_path))
         )
         created_reports.append(
-            GeneratedReport(sync_run_id=sync_run.id, report_type=report_type, output_format="html", file_path=str(html_path))
+            GeneratedReport(sync_run_id=sync_run.id, report_type=report_type, output_format="docx", file_path=str(docx_path))
         )
 
         # PDF output — optional, depends on weasyprint being installed

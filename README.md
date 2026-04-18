@@ -45,6 +45,14 @@ Then open **http://127.0.0.1:8000** in your browser.
 
 Click **Run Sync** in the top right. You'll see borrowers load, covenant breaches flag (Pinnacle Fintech trips its EBITDA floor), a reconciliation break appear (Verdant Energy's valuation is $210M in the CRM but $195M at the fund admin), and an investor update get written.
 
+## Dashboard screenshot
+
+![Dashboard overview](docs/screenshots/dashboard-overview.png)
+
+## CRM source screenshot
+
+![CRM source data](docs/screenshots/crm-source-data.png)
+
 ## What you're looking at on the dashboard
 
 | Section | What's there |
@@ -93,3 +101,12 @@ python -m pytest tests/ -v
 11 tests, all green. CI runs them on every push against Python 3.11 and 3.12.
 
 
+Built as a portfolio piece for a private credit ops role. The point isn't the mock data — it's showing the pattern that middle-office teams actually need: validated input, reconciled numbers, audited outputs, covenant monitoring, and an agent layer on top.
+
+## Contributors
+
+See [CONTRIBUTORS.md](/Users/mihir/Downloads/CRM%20to%20Reporting/CONTRIBUTORS.md).
+
+## Tiny easter egg
+
+For a little internet nostalgia while testing demos: [Google Gravity](https://mrdoob.com/projects/chromeexperiments/google-gravity/).

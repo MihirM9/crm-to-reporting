@@ -95,7 +95,12 @@ def download_report(report_id: int):
         path = Path(report.file_path)
         if not path.exists():
             return jsonify({"message": "Report file missing on disk"}), 404
-        mime_map = {".html": "text/html", ".md": "text/markdown", ".pdf": "application/pdf"}
+        mime_map = {
+            ".html": "text/html",
+            ".md": "text/markdown",
+            ".pdf": "application/pdf",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }
         return send_file(path, mimetype=mime_map.get(path.suffix, "application/octet-stream"), download_name=path.name)
     finally:
         db.close()

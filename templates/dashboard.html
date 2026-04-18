@@ -1263,11 +1263,7 @@
                     <td><span class="badge badge-neutral">{{ report.output_format }}</span></td>
                     <td class="mono">#{{ report.sync_run_id }}</td>
                     <td>
-                      {% if report.output_format == 'html' %}
-                      <button class="btn btn-sm btn-secondary" onclick="viewReport({{ report.id }})">View</button>
-                      {% else %}
                       <a class="btn btn-sm btn-secondary" href="/api/reporting/reports/{{ report.id }}/download">Download</a>
-                      {% endif %}
                     </td>
                   </tr>
                   {% endfor %}
@@ -1685,7 +1681,7 @@
                   <thead><tr><th>Type</th><th>Format</th><th>Sync Run</th><th></th></tr></thead>
                   <tbody>
                   {% for report in reports %}
-                  <tr id="report-row-{{ report.id }}" style="cursor:pointer" onclick="viewReport({{ report.id }})">
+                  <tr id="report-row-{{ report.id }}">
                     <td>
                       <span class="badge {% if report.report_type == 'investor' %}badge-purple{% else %}badge-info{% endif %}">
                         {{ report.report_type }}
@@ -1694,11 +1690,7 @@
                     <td><span class="badge badge-neutral">{{ report.output_format }}</span></td>
                     <td class="mono">#{{ report.sync_run_id }}</td>
                     <td>
-                      {% if report.output_format == 'html' %}
-                      <span class="btn btn-sm btn-secondary">View</span>
-                      {% else %}
                       <a class="btn btn-sm btn-secondary" href="/api/reporting/reports/{{ report.id }}/download" onclick="event.stopPropagation()">Download</a>
-                      {% endif %}
                     </td>
                   </tr>
                   {% endfor %}

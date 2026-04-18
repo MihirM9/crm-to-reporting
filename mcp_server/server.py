@@ -31,6 +31,8 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
+from xml.etree import ElementTree
+from zipfile import ZipFile
 
 from sqlalchemy import func, select
 
@@ -291,12 +293,26 @@ def tool_read_report(args: dict) -> dict:
         path = Path(report.file_path)
         if not path.exists():
             return {"error": f"Report file missing on disk: {path}"}
+        if report.output_format == "docx":
+            with ZipFile(path) as docx:
+                xml_bytes = docx.read("word/document.xml")
+            root = ElementTree.fromstring(xml_bytes)
+            ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            paragraphs: list[str] = []
+            for paragraph in root.findall(".//w:p", ns):
+                texts = [node.text or "" for node in paragraph.findall(".//w:t", ns)]
+                line = "".join(texts).strip()
+                if line:
+                    paragraphs.append(line)
+            content = "\n".join(paragraphs)
+        else:
+            content = path.read_text(encoding="utf-8")
         return {
             "report_id": report.id,
             "report_type": report.report_type,
             "output_format": report.output_format,
             "sync_run_id": report.sync_run_id,
-            "content": path.read_text(encoding="utf-8"),
+            "content": content,
         }
     finally:
         db.close()

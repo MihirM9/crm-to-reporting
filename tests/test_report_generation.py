@@ -17,6 +17,7 @@ def test_generate_reports_writes_both_versions():
 
         reports = generate_reports(db, sync_run)
         assert len(reports) == 4
+        assert {report.output_format for report in reports} == {"markdown", "docx"}
         for report in reports:
             assert report.file_path
     finally:
